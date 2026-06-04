@@ -11,7 +11,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "tsx server/index.ts"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
