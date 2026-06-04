@@ -66,7 +66,7 @@ export default function MyAttendance() {
       header: 'Status',
       render: (record: AttendanceRecord) => {
         let variant: 'present' | 'absent' | 'late' | 'proxy' = 'default' as any;
-        let label = record.status;
+        let label: string = record.status;
         
         if (record.status === 'present') variant = 'present';
         else if (record.status === 'absent') variant = 'absent';
