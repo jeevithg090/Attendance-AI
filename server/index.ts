@@ -33,12 +33,14 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ── Middleware ────────────────────────────────────────────
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [
-      process.env.FRONTEND_URL, 
-      'https://attendance-project-gamma.vercel.app' // Explicitly trust the Vercel frontend
-    ].filter(Boolean) as string[]
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+// Unconditionally allow both local development and the Vercel production URL
+const allowedOrigins = [
+  'http://localhost:5173', 
+  'http://localhost:5174', 
+  'http://localhost:3000',
+  'https://attendance-project-gamma.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean) as string[];
 
 app.use(cors({
   origin: allowedOrigins,
