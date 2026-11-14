@@ -10,7 +10,12 @@ import {
   subjects,
   users,
 } from '../db/schema';
-import { ATTENDED_STATUSES, attendancePercentage, countsAsAttended, evaluateAttendance } from '../lib/attendance';
+import {
+  ATTENDED_STATUSES,
+  attendancePercentage,
+  countsAsAttended,
+  evaluateAttendance,
+} from '../lib/attendance';
 import { bestFaceMatch } from '../lib/face';
 import { asyncHandler, badRequest, conflict, forbidden, isUniqueViolation, notFound } from '../http/errors';
 import { markAttendanceSchema, overrideSchema, queryString, uuidParam } from '../http/validation';
@@ -40,7 +45,9 @@ async function attendedCountsBySubject(subjectId: string) {
   const rows = await db
     .select({ studentId: attendanceRecords.studentId, count: count() })
     .from(attendanceRecords)
-    .where(and(eq(attendanceRecords.subjectId, subjectId), inArray(attendanceRecords.status, attendedStatuses)))
+    .where(
+      and(eq(attendanceRecords.subjectId, subjectId), inArray(attendanceRecords.status, attendedStatuses)),
+    )
     .groupBy(attendanceRecords.studentId);
   return new Map(rows.map((r) => [r.studentId, r.count]));
 }
@@ -156,7 +163,11 @@ router.post(
     const me = currentUser(req);
     const { recordId, status, reason } = overrideSchema.parse(req.body);
 
-    const [existing] = await db.select().from(attendanceRecords).where(eq(attendanceRecords.id, recordId)).limit(1);
+    const [existing] = await db
+      .select()
+      .from(attendanceRecords)
+      .where(eq(attendanceRecords.id, recordId))
+      .limit(1);
     if (!existing) throw notFound('Attendance record not found');
     const session = await getSessionOrThrow(existing.sessionId);
     assertOwnsResource(me, session.teacherId);
@@ -271,7 +282,10 @@ router.get(
       db
         .select({
           total: count(),
-          attended: sql<number>`count(*) filter (where ${inArray(attendanceRecords.status, attendedStatuses)})`.mapWith(Number),
+          attended:
+            sql<number>`count(*) filter (where ${inArray(attendanceRecords.status, attendedStatuses)})`.mapWith(
+              Number,
+            ),
           flagged: sql<number>`count(*) filter (where ${attendanceRecords.flagged})`.mapWith(Number),
         })
         .from(attendanceRecords)

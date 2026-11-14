@@ -58,7 +58,9 @@ router.get(
     const rows = await db
       .select()
       .from(attendanceSessions)
-      .where(and(eq(attendanceSessions.status, 'active'), inArray(attendanceSessions.subjectId, enrolledSubjects)))
+      .where(
+        and(eq(attendanceSessions.status, 'active'), inArray(attendanceSessions.subjectId, enrolledSubjects)),
+      )
       .orderBy(desc(attendanceSessions.startTime));
     res.json({ success: true, data: rows.map(({ sessionToken: _token, ...rest }) => rest) });
   }),

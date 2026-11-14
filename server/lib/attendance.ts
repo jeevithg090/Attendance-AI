@@ -37,9 +37,7 @@ export function evaluateAttendance(input: EvaluationInput): EvaluationResult {
 
   if (input.faceScore < input.faceThreshold) {
     proxy = true;
-    flagReasons.push(
-      `Face match score ${input.faceScore.toFixed(2)} below threshold ${input.faceThreshold}`,
-    );
+    flagReasons.push(`Face match score ${input.faceScore.toFixed(2)} below threshold ${input.faceThreshold}`);
   }
 
   if (input.geofence?.enabled) {

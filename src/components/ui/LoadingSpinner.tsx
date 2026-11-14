@@ -38,9 +38,7 @@ export default function LoadingSpinner({ size = 'md', message, variant = 'spinne
       ) : (
         <Loader2 size={iconSize} className="text-[var(--accent-primary)] animate-spin" />
       )}
-      {message && (
-        <p className="text-sm text-[var(--text-muted)]">{message}</p>
-      )}
+      {message && <p className="text-sm text-[var(--text-muted)]">{message}</p>}
     </div>
   );
 }

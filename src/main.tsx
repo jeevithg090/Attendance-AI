@@ -76,15 +76,17 @@ function App() {
       <Toaster
         position="top-right"
         toastOptions={{
-          className:
-            'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)]',
+          className: 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)]',
           duration: 4000,
         }}
       />
 
       <Suspense fallback={<LoadingSpinner message="Loading..." />}>
         <Routes>
-          <Route path="/login" element={isAuthenticated && user ? <Navigate to={home} replace /> : <Login />} />
+          <Route
+            path="/login"
+            element={isAuthenticated && user ? <Navigate to={home} replace /> : <Login />}
+          />
 
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to={home} replace />} />
@@ -96,7 +98,10 @@ function App() {
             <Route path="/teacher" element={guard(<TeacherDashboard />, ['teacher'])} />
             <Route path="/teacher/take-attendance" element={guard(<TakeAttendance />, ['teacher'])} />
             <Route path="/teacher/class-attendance" element={guard(<ClassAttendance />, ['teacher'])} />
-            <Route path="/teacher/manage-subjects" element={guard(<ManageSubjects />, ['teacher', 'admin'])} />
+            <Route
+              path="/teacher/manage-subjects"
+              element={guard(<ManageSubjects />, ['teacher', 'admin'])}
+            />
 
             <Route path="/admin" element={guard(<AdminDashboard />, ['admin'])} />
             <Route path="/admin/manage-students" element={guard(<ManageStudents />, ['admin'])} />

@@ -14,7 +14,9 @@ export default function AttendanceReports() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">System Reports</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">Generate and export campus-wide attendance analytics.</p>
+          <p className="text-[var(--text-muted)] text-sm mt-1">
+            Generate and export campus-wide attendance analytics.
+          </p>
         </div>
       </div>
 
@@ -24,7 +26,8 @@ export default function AttendanceReports() {
         </div>
         <h2 className="text-xl font-bold mb-2">Reports Module Under Construction</h2>
         <p className="text-[var(--text-muted)] max-w-md mx-auto">
-          We're currently building advanced analytics including department-wise trends, proxy attempt heatmaps, and automated PDF report generation. Check back in the next update!
+          We're currently building advanced analytics including department-wise trends, proxy attempt
+          heatmaps, and automated PDF report generation. Check back in the next update!
         </p>
       </Card>
     </div>

@@ -28,21 +28,21 @@ export function useFaceRecognition() {
   const loadModels = useCallback(async () => {
     if (state.isModelLoaded) return;
 
-    setState(s => ({ ...s, isLoading: true, loadingProgress: 'Loading face detection model...' }));
+    setState((s) => ({ ...s, isLoading: true, loadingProgress: 'Loading face detection model...' }));
 
     try {
       const MODEL_URL = '/models';
 
-      setState(s => ({ ...s, loadingProgress: 'Loading face detector...' }));
+      setState((s) => ({ ...s, loadingProgress: 'Loading face detector...' }));
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
 
-      setState(s => ({ ...s, loadingProgress: 'Loading landmark model...' }));
+      setState((s) => ({ ...s, loadingProgress: 'Loading landmark model...' }));
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
 
-      setState(s => ({ ...s, loadingProgress: 'Loading recognition model...' }));
+      setState((s) => ({ ...s, loadingProgress: 'Loading recognition model...' }));
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
-      setState(s => ({
+      setState((s) => ({
         ...s,
         isModelLoaded: true,
         isLoading: false,
@@ -51,7 +51,7 @@ export function useFaceRecognition() {
       }));
     } catch (error) {
       console.error('Failed to load face models:', error);
-      setState(s => ({
+      setState((s) => ({
         ...s,
         isLoading: false,
         error: 'Failed to load face recognition models. Please check your internet connection.',
@@ -72,7 +72,7 @@ export function useFaceRecognition() {
       return true;
     } catch (error) {
       console.error('Webcam access error:', error);
-      setState(s => ({ ...s, error: 'Camera access denied. Please allow camera permissions.' }));
+      setState((s) => ({ ...s, error: 'Camera access denied. Please allow camera permissions.' }));
       return false;
     }
   }, []);
@@ -80,135 +80,146 @@ export function useFaceRecognition() {
   // ── Stop Webcam ──────────────────────────────────────────
   const stopWebcam = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
   }, []);
 
   // ── Detect Face ──────────────────────────────────────────
-  const detectFace = useCallback(async (videoElement: HTMLVideoElement) => {
-    if (!state.isModelLoaded) return null;
+  const detectFace = useCallback(
+    async (videoElement: HTMLVideoElement) => {
+      if (!state.isModelLoaded) return null;
 
-    const detection = await faceapi
-      .detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions({
-        inputSize: 320,
-        scoreThreshold: 0.5,
-      }))
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+      const detection = await faceapi
+        .detectSingleFace(
+          videoElement,
+          new faceapi.TinyFaceDetectorOptions({
+            inputSize: 320,
+            scoreThreshold: 0.5,
+          }),
+        )
+        .withFaceLandmarks()
+        .withFaceDescriptor();
 
-    return detection;
-  }, [state.isModelLoaded]);
+      return detection;
+    },
+    [state.isModelLoaded],
+  );
 
   // ── Extract Descriptor ───────────────────────────────────
-  const extractDescriptor = useCallback(async (videoElement: HTMLVideoElement): Promise<Float32Array | null> => {
-    const detection = await detectFace(videoElement);
-    if (!detection) return null;
+  const extractDescriptor = useCallback(
+    async (videoElement: HTMLVideoElement): Promise<Float32Array | null> => {
+      const detection = await detectFace(videoElement);
+      if (!detection) return null;
 
-    // Anti-spoofing: check face size (must be at least 20% of frame width)
-    const faceWidth = detection.detection.box.width;
-    const frameWidth = videoElement.videoWidth;
-    if (faceWidth / frameWidth < 0.2) return null;
+      // Anti-spoofing: check face size (must be at least 20% of frame width)
+      const faceWidth = detection.detection.box.width;
+      const frameWidth = videoElement.videoWidth;
+      if (faceWidth / frameWidth < 0.2) return null;
 
-    return detection.descriptor;
-  }, [detectFace]);
+      return detection.descriptor;
+    },
+    [detectFace],
+  );
 
   // ── Capture Multiple Descriptors (for enrollment) ───────
-  const captureEnrollmentDescriptors = useCallback(async (
-    videoElement: HTMLVideoElement,
-    count: number = 5,
-    onProgress?: (captured: number) => void
-  ): Promise<number[][]> => {
-    const descriptors: number[][] = [];
-    const maxAttempts = count * 4;
+  const captureEnrollmentDescriptors = useCallback(
+    async (
+      videoElement: HTMLVideoElement,
+      count: number = 5,
+      onProgress?: (captured: number) => void,
+    ): Promise<number[][]> => {
+      const descriptors: number[][] = [];
+      const maxAttempts = count * 4;
 
-    for (let attempt = 0; attempt < maxAttempts && descriptors.length < count; attempt++) {
-      // Wait a moment between captures
-      await new Promise(resolve => setTimeout(resolve, 800));
+      for (let attempt = 0; attempt < maxAttempts && descriptors.length < count; attempt++) {
+        // Wait a moment between captures
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
-      const descriptor = await extractDescriptor(videoElement);
-      if (descriptor) {
-        descriptors.push(Array.from(descriptor));
-        onProgress?.(descriptors.length);
+        const descriptor = await extractDescriptor(videoElement);
+        if (descriptor) {
+          descriptors.push(Array.from(descriptor));
+          onProgress?.(descriptors.length);
+        }
       }
-    }
 
-    return descriptors;
-  }, [extractDescriptor]);
+      return descriptors;
+    },
+    [extractDescriptor],
+  );
 
   // ── Capture a single live descriptor (for check-in) ─────
   // Matching against the enrolled descriptors happens on the server.
-  const captureDescriptor = useCallback(async (
-    videoElement: HTMLVideoElement,
-    maxAttempts: number = 5
-  ): Promise<number[] | null> => {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const descriptor = await extractDescriptor(videoElement);
-      if (descriptor) return Array.from(descriptor);
-      await new Promise(resolve => setTimeout(resolve, 400));
-    }
-    return null;
-  }, [extractDescriptor]);
+  const captureDescriptor = useCallback(
+    async (videoElement: HTMLVideoElement, maxAttempts: number = 5): Promise<number[] | null> => {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const descriptor = await extractDescriptor(videoElement);
+        if (descriptor) return Array.from(descriptor);
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      return null;
+    },
+    [extractDescriptor],
+  );
 
   // ── Draw Detection on Canvas ────────────────────────────
-  const drawDetection = useCallback(async (
-    videoElement: HTMLVideoElement,
-    canvasElement: HTMLCanvasElement,
-    isMatched?: boolean
-  ) => {
-    const detection = await detectFace(videoElement);
+  const drawDetection = useCallback(
+    async (videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement, isMatched?: boolean) => {
+      const detection = await detectFace(videoElement);
 
-    const displaySize = {
-      width: videoElement.videoWidth,
-      height: videoElement.videoHeight,
-    };
-    faceapi.matchDimensions(canvasElement, displaySize);
+      const displaySize = {
+        width: videoElement.videoWidth,
+        height: videoElement.videoHeight,
+      };
+      faceapi.matchDimensions(canvasElement, displaySize);
 
-    const ctx = canvasElement.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      const ctx = canvasElement.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    if (detection) {
-      const resizedDetection = faceapi.resizeResults(detection, displaySize);
-      const box = resizedDetection.detection.box;
+      if (detection) {
+        const resizedDetection = faceapi.resizeResults(detection, displaySize);
+        const box = resizedDetection.detection.box;
 
-      // Draw bounding box
-      ctx.strokeStyle = isMatched === true ? '#10B981' : isMatched === false ? '#F43F5E' : '#4F46E5';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(box.x, box.y, box.width, box.height);
+        // Draw bounding box
+        ctx.strokeStyle = isMatched === true ? '#10B981' : isMatched === false ? '#F43F5E' : '#4F46E5';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
 
-      // Draw corner accents
-      const cornerSize = 15;
-      ctx.lineWidth = 4;
-      // Top-left
-      ctx.beginPath();
-      ctx.moveTo(box.x, box.y + cornerSize);
-      ctx.lineTo(box.x, box.y);
-      ctx.lineTo(box.x + cornerSize, box.y);
-      ctx.stroke();
-      // Top-right
-      ctx.beginPath();
-      ctx.moveTo(box.x + box.width - cornerSize, box.y);
-      ctx.lineTo(box.x + box.width, box.y);
-      ctx.lineTo(box.x + box.width, box.y + cornerSize);
-      ctx.stroke();
-      // Bottom-left
-      ctx.beginPath();
-      ctx.moveTo(box.x, box.y + box.height - cornerSize);
-      ctx.lineTo(box.x, box.y + box.height);
-      ctx.lineTo(box.x + cornerSize, box.y + box.height);
-      ctx.stroke();
-      // Bottom-right
-      ctx.beginPath();
-      ctx.moveTo(box.x + box.width - cornerSize, box.y + box.height);
-      ctx.lineTo(box.x + box.width, box.y + box.height);
-      ctx.lineTo(box.x + box.width, box.y + box.height - cornerSize);
-      ctx.stroke();
+        // Draw corner accents
+        const cornerSize = 15;
+        ctx.lineWidth = 4;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(box.x, box.y + cornerSize);
+        ctx.lineTo(box.x, box.y);
+        ctx.lineTo(box.x + cornerSize, box.y);
+        ctx.stroke();
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(box.x + box.width - cornerSize, box.y);
+        ctx.lineTo(box.x + box.width, box.y);
+        ctx.lineTo(box.x + box.width, box.y + cornerSize);
+        ctx.stroke();
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(box.x, box.y + box.height - cornerSize);
+        ctx.lineTo(box.x, box.y + box.height);
+        ctx.lineTo(box.x + cornerSize, box.y + box.height);
+        ctx.stroke();
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(box.x + box.width - cornerSize, box.y + box.height);
+        ctx.lineTo(box.x + box.width, box.y + box.height);
+        ctx.lineTo(box.x + box.width, box.y + box.height - cornerSize);
+        ctx.stroke();
 
-      return true;
-    }
-    return false;
-  }, [detectFace]);
+        return true;
+      }
+      return false;
+    },
+    [detectFace],
+  );
 
   // Cleanup on unmount
   useEffect(() => {

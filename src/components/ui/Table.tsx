@@ -22,7 +22,14 @@ interface TableProps<T> {
   isLoading?: boolean;
 }
 
-export function Table<T>({ columns, data, keyExtractor, rowClassName, emptyMessage = 'No data found', isLoading }: TableProps<T>) {
+export function Table<T>({
+  columns,
+  data,
+  keyExtractor,
+  rowClassName,
+  emptyMessage = 'No data found',
+  isLoading,
+}: TableProps<T>) {
   if (isLoading) {
     return (
       <div className="table-container">
@@ -30,7 +37,9 @@ export function Table<T>({ columns, data, keyExtractor, rowClassName, emptyMessa
           <thead>
             <tr>
               {columns.map((col) => (
-                <th key={col.key} style={col.width ? { width: col.width } : undefined}>{col.header}</th>
+                <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+                  {col.header}
+                </th>
               ))}
             </tr>
           </thead>
@@ -77,7 +86,9 @@ export function Table<T>({ columns, data, keyExtractor, rowClassName, emptyMessa
             <tr key={keyExtractor(item)} className={rowClassName?.(item) || ''}>
               {columns.map((col) => (
                 <td key={col.key}>
-                  {col.render ? col.render(item, index) : String((item as Record<string, unknown>)[col.key] ?? '')}
+                  {col.render
+                    ? col.render(item, index)
+                    : String((item as Record<string, unknown>)[col.key] ?? '')}
                 </td>
               ))}
             </tr>

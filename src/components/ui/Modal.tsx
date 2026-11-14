@@ -22,10 +22,20 @@ const sizeStyles: Record<string, string> = {
   full: 'max-w-[95vw] max-h-[95vh]',
 };
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md', showClose = true }: ModalProps) {
-  const handleEscape = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  showClose = true,
+}: ModalProps) {
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    },
+    [onClose],
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -43,10 +53,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', s
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div
@@ -60,9 +67,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', s
         {/* Header */}
         {(title || showClose) && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-            {title && (
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
-            )}
+            {title && <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>}
             {showClose && (
               <button
                 onClick={onClose}
@@ -76,9 +81,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', s
         )}
 
         {/* Content */}
-        <div className="p-6 max-h-[70vh] overflow-y-auto">
-          {children}
-        </div>
+        <div className="p-6 max-h-[70vh] overflow-y-auto">{children}</div>
       </div>
     </div>
   );

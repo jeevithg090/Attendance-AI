@@ -5,10 +5,20 @@
 import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
-  LayoutDashboard, ScanFace, ClipboardCheck,
-  UserCog, FileBarChart, Settings, Bell,
-  ChevronLeft, ChevronRight, GraduationCap, UserCircle,
-  CalendarCheck, BookMarked, Shield
+  LayoutDashboard,
+  ScanFace,
+  ClipboardCheck,
+  UserCog,
+  FileBarChart,
+  Settings,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  GraduationCap,
+  UserCircle,
+  CalendarCheck,
+  BookMarked,
+  Shield,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -61,7 +71,9 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onNav
       className={`sidebar fixed top-0 left-0 h-screen flex flex-col z-40 w-[260px] ${
         collapsed ? 'lg:w-16' : 'lg:w-[260px]'
       } ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
-      style={{ transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+      style={{
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-[var(--border)]">

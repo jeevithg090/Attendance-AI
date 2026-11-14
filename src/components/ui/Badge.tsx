@@ -4,7 +4,8 @@
 
 import React from 'react';
 
-export type BadgeVariant = 'present' | 'absent' | 'late' | 'proxy' | 'primary' | 'warning' | 'info' | 'default';
+export type BadgeVariant =
+  'present' | 'absent' | 'late' | 'proxy' | 'primary' | 'warning' | 'info' | 'default';
 
 interface BadgeProps {
   variant?: BadgeVariant;
@@ -36,7 +37,13 @@ const dotColors: Record<string, string> = {
   default: 'bg-gray-400',
 };
 
-export default function Badge({ variant = 'default', size = 'sm', children, className = '', dot = false }: BadgeProps) {
+export default function Badge({
+  variant = 'default',
+  size = 'sm',
+  children,
+  className = '',
+  dot = false,
+}: BadgeProps) {
   return (
     <span
       className={`
@@ -46,9 +53,7 @@ export default function Badge({ variant = 'default', size = 'sm', children, clas
         ${className}
       `}
     >
-      {dot && (
-        <span className={`w-1.5 h-1.5 rounded-full ${dotColors[variant]} animate-pulse`} />
-      )}
+      {dot && <span className={`w-1.5 h-1.5 rounded-full ${dotColors[variant]} animate-pulse`} />}
       {children}
     </span>
   );

@@ -13,11 +13,7 @@ import {
 } from '../http/validation';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { currentUser, requireRole } from '../middleware/rbac';
-import {
-  assertOwnsResource,
-  getSubjectOrThrow,
-  type Subject,
-} from '../services/attendanceService';
+import { assertOwnsResource, getSubjectOrThrow, type Subject } from '../services/attendanceService';
 
 const router = Router();
 router.use(authenticate);

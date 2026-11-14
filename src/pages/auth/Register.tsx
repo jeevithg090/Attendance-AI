@@ -29,7 +29,7 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       await api.post('/auth/register', formData);
       toast.success('User registered successfully');
@@ -59,13 +59,14 @@ export default function Register() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">Register New User</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">Create accounts for students, teachers, or admins.</p>
+          <p className="text-[var(--text-muted)] text-sm mt-1">
+            Create accounts for students, teachers, or admins.
+          </p>
         </div>
       </div>
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-6">
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
@@ -81,7 +82,7 @@ export default function Register() {
                 placeholder="e.g. John Doe"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Email Address
@@ -96,33 +97,21 @@ export default function Register() {
                 placeholder="john@bmsce.ac.in"
               />
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                Role
-              </label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="input"
-              >
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Role</label>
+              <select name="role" value={formData.role} onChange={handleChange} className="input">
                 <option value="student">Student</option>
                 <option value="teacher">Teacher</option>
                 <option value="admin">Administrator</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Department
               </label>
-              <select
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                className="input"
-              >
+              <select name="department" value={formData.department} onChange={handleChange} className="input">
                 <option value="Computer Science">Computer Science</option>
                 <option value="Information Science">Information Science</option>
                 <option value="Mechanical Engineering">Mechanical Engineering</option>
@@ -163,7 +152,7 @@ export default function Register() {
                 />
               </div>
             )}
-            
+
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Phone Number (Optional)
@@ -177,8 +166,8 @@ export default function Register() {
                 placeholder="+91..."
               />
             </div>
-            
-             <div>
+
+            <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Temporary Password
               </label>
@@ -190,16 +179,17 @@ export default function Register() {
                 onChange={handleChange}
                 className="input"
               />
-               <p className="text-xs text-[var(--text-muted)] mt-1">User should change this upon first login.</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                User should change this upon first login.
+              </p>
             </div>
           </div>
 
           <div className="pt-4 border-t border-[var(--border)] flex justify-end">
-             <Button type="submit" isLoading={isLoading} icon={<User size={18} />}>
-                Register User
-             </Button>
+            <Button type="submit" isLoading={isLoading} icon={<User size={18} />}>
+              Register User
+            </Button>
           </div>
-
         </form>
       </Card>
     </div>

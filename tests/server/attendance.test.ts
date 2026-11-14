@@ -27,7 +27,9 @@ describe('evaluateAttendance', () => {
   });
 
   it('does not mark late when the late threshold is disabled', () => {
-    expect(evaluateAttendance({ ...base, now: minutesAfter(60), lateThresholdMinutes: 0 }).status).toBe('present');
+    expect(evaluateAttendance({ ...base, now: minutesAfter(60), lateThresholdMinutes: 0 }).status).toBe(
+      'present',
+    );
   });
 
   it('flags a low face score as a proxy', () => {
@@ -51,7 +53,11 @@ describe('evaluateAttendance', () => {
   });
 
   it('ignores location entirely when geofencing is disabled', () => {
-    const result = evaluateAttendance({ ...base, location: offCampus, geofence: { ...campus, enabled: false } });
+    const result = evaluateAttendance({
+      ...base,
+      location: offCampus,
+      geofence: { ...campus, enabled: false },
+    });
     expect(result).toEqual({ status: 'present', flagged: false, flagReasons: [] });
   });
 

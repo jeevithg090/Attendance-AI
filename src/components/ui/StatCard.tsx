@@ -65,13 +65,13 @@ export default function StatCard({
   return (
     <div className={`stat-card ${variant} animate-fade-in-up ${className}`}>
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-2.5 rounded-[var(--radius-md)] ${iconBgColors[variant]}`}>
-          {icon}
-        </div>
+        <div className={`p-2.5 rounded-[var(--radius-md)] ${iconBgColors[variant]}`}>{icon}</div>
         {trend && (
-          <div className={`flex items-center gap-1 text-xs font-medium ${
-            trend.isPositive ? 'text-emerald-400' : 'text-rose-400'
-          }`}>
+          <div
+            className={`flex items-center gap-1 text-xs font-medium ${
+              trend.isPositive ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
             {trend.isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
             {trend.value}%
           </div>
@@ -79,8 +79,13 @@ export default function StatCard({
       </div>
       <div className="space-y-1">
         <p className="text-[var(--text-muted)] text-sm font-medium">{title}</p>
-        <p className="text-2xl font-bold text-[var(--text-primary)] tracking-tight" style={{ fontFamily: 'var(--font-mono)' }}>
-          {prefix}{displayValue.toLocaleString()}{suffix}
+        <p
+          className="text-2xl font-bold text-[var(--text-primary)] tracking-tight"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {prefix}
+          {displayValue.toLocaleString()}
+          {suffix}
         </p>
       </div>
     </div>

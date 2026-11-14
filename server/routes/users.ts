@@ -41,7 +41,11 @@ router.get(
     if (search) {
       const pattern = `%${escapeLike(search)}%`;
       conditions.push(
-        or(ilike(users.displayName, pattern), ilike(users.email, pattern), ilike(users.enrollmentId, pattern))!,
+        or(
+          ilike(users.displayName, pattern),
+          ilike(users.email, pattern),
+          ilike(users.enrollmentId, pattern),
+        )!,
       );
     }
     const where = conditions.length > 0 ? and(...conditions) : undefined;

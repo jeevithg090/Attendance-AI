@@ -26,14 +26,16 @@ export default function ClassAttendance() {
         if (data.data.length > 0) {
           setSelectedSubject(data.data[0].id);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     fetchSubjects();
   }, []);
 
   useEffect(() => {
     if (!selectedSubject) return;
-    
+
     const fetchStats = async () => {
       setIsLoading(true);
       try {
@@ -45,30 +47,35 @@ export default function ClassAttendance() {
         setIsLoading(false);
       }
     };
-    
+
     fetchStats();
   }, [selectedSubject]);
 
   const handleExportCSV = () => {
     if (stats.length === 0) return;
-    
-    const subjectName = subjects.find(s => s.id === selectedSubject)?.name || 'subject';
+
+    const subjectName = subjects.find((s) => s.id === selectedSubject)?.name || 'subject';
     const csvContent = [
       ['Student Name', 'Enrollment ID', 'Total Present', 'Total Classes', 'Percentage'],
-      ...stats.map(s => [
+      ...stats.map((s) => [
         s.displayName,
         s.enrollmentId,
         s.totalPresent,
         s.totalClasses,
-        `${s.percentage}%`
-      ])
-    ].map(e => e.join(",")).join("\n");
+        `${s.percentage}%`,
+      ]),
+    ]
+      .map((e) => e.join(','))
+      .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `attendance_${subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `attendance_${subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -83,25 +90,29 @@ export default function ClassAttendance() {
           <p className="font-medium text-[var(--text-primary)]">{s.displayName}</p>
           <p className="text-xs text-[var(--text-muted)] font-mono">{s.enrollmentId}</p>
         </div>
-      )
+      ),
     },
     {
       key: 'present',
       header: 'Classes Attended',
       render: (s: StudentAttendanceStat) => (
-        <span className="font-medium">{s.totalPresent} / {s.totalClasses}</span>
-      )
+        <span className="font-medium">
+          {s.totalPresent} / {s.totalClasses}
+        </span>
+      ),
     },
     {
       key: 'percentage',
       header: 'Percentage',
       render: (s: StudentAttendanceStat) => (
-        <span className={`font-bold font-mono ${
-          s.percentage < 65 ? 'text-rose-400' : s.percentage < 75 ? 'text-amber-400' : 'text-emerald-400'
-        }`}>
+        <span
+          className={`font-bold font-mono ${
+            s.percentage < 65 ? 'text-rose-400' : s.percentage < 75 ? 'text-amber-400' : 'text-emerald-400'
+          }`}
+        >
           {s.percentage}%
         </span>
-      )
+      ),
     },
     {
       key: 'status',
@@ -109,11 +120,16 @@ export default function ClassAttendance() {
       render: (s: StudentAttendanceStat) => {
         let variant: BadgeVariant = 'present';
         let label = 'Good';
-        if (s.percentage < 65) { variant = 'absent'; label = 'Critical'; }
-        else if (s.percentage < 75) { variant = 'warning'; label = 'Warning'; }
+        if (s.percentage < 65) {
+          variant = 'absent';
+          label = 'Critical';
+        } else if (s.percentage < 75) {
+          variant = 'warning';
+          label = 'Warning';
+        }
         return <Badge variant={variant}>{label}</Badge>;
-      }
-    }
+      },
+    },
   ];
 
   return (
@@ -125,10 +141,12 @@ export default function ClassAttendance() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Class Attendance</h1>
-            <p className="text-[var(--text-muted)] text-sm mt-1">View overall attendance stats for your subjects.</p>
+            <p className="text-[var(--text-muted)] text-sm mt-1">
+              View overall attendance stats for your subjects.
+            </p>
           </div>
         </div>
-        
+
         <button
           onClick={handleExportCSV}
           disabled={stats.length === 0}
@@ -145,26 +163,28 @@ export default function ClassAttendance() {
             <Filter size={16} />
             <span className="text-sm font-medium">Select Subject:</span>
           </div>
-          
-          <select 
+
+          <select
             className="input w-auto min-w-[250px]"
             value={selectedSubject}
             onChange={(e) => setSelectedSubject(e.target.value)}
           >
             {subjects.length === 0 && <option value="">No subjects assigned</option>}
-            {subjects.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.code})
+              </option>
             ))}
           </select>
         </div>
 
-        <Table 
+        <Table
           columns={columns}
           data={stats}
           keyExtractor={(s) => s.studentId}
           isLoading={isLoading}
           emptyMessage="No students enrolled in this subject yet."
-          rowClassName={(s) => s.percentage < 65 ? 'row-absent' : ''}
+          rowClassName={(s) => (s.percentage < 65 ? 'row-absent' : '')}
         />
       </Card>
     </div>
