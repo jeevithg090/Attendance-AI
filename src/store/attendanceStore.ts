@@ -13,13 +13,14 @@ interface AttendanceState {
   isLoading: boolean;
 
   fetchActiveSessions: () => Promise<void>;
+  /** Load the teacher's currently active sessions into `activeSessions`. */
   fetchTeacherSessions: (teacherId: string) => Promise<void>;
   fetchSessionRecords: (sessionId: string) => Promise<void>;
   createSession: (subjectId: string) => Promise<AttendanceSession>;
   closeSession: (sessionId: string) => Promise<void>;
   markAttendance: (data: {
     sessionId: string;
-    faceMatchScore: number;
+    faceDescriptor: number[];
     latitude?: number;
     longitude?: number;
     deviceInfo?: string;
@@ -47,7 +48,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
   fetchTeacherSessions: async (teacherId) => {
     set({ isLoading: true });
     try {
-      const { data } = await api.get('/sessions', { params: { teacherId, limit: 20 } });
+      const { data } = await api.get('/sessions', { params: { teacherId, status: 'active', limit: 20 } });
       set({ activeSessions: data.data, isLoading: false });
     } catch {
       set({ isLoading: false });

@@ -16,7 +16,8 @@ export interface User {
   enrollmentId?: string;
   employeeId?: string;
   faceEnrolled: boolean;
-  faceDescriptors?: number[][];
+  /** Number of enrolled face samples (raw descriptors never leave the server). */
+  faceDescriptorCount?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -238,4 +239,32 @@ export interface SubjectEnrollment {
   id: string;
   subjectId: string;
   studentId: string;
+}
+
+// ── Reporting ─────────────────────────────────────────────
+export interface StudentAttendanceStat {
+  studentId: string;
+  displayName: string;
+  enrollmentId: string | null;
+  totalPresent: number;
+  totalClasses: number;
+  percentage: number;
+}
+
+export interface SubjectAttendanceSummary {
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+  totalClasses: number;
+  attended: number;
+  percentage: number;
+}
+
+export interface AdminDashboardStats {
+  totalStudents: number;
+  totalTeachers: number;
+  totalSubjects: number;
+  activeSessions: number;
+  todayAttendancePercent: number;
+  proxyAttemptsToday: number;
 }

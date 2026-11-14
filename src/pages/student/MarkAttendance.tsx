@@ -2,17 +2,17 @@
 // AttendAI — Mark Attendance Page (Student)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useFaceRecognition } from '../../hooks/useFaceRecognition';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { ScanFace, MapPin, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '../../api/client';
 
 export default function MarkAttendance() {
   const { user } = useAuthStore();
@@ -67,7 +67,7 @@ export default function MarkAttendance() {
       return;
     }
     
-    if (!user?.faceEnrolled || !user.faceDescriptors?.length) {
+    if (!user?.faceEnrolled) {
       toast.error('Face data not enrolled. Please update your profile first.');
       navigate('/profile');
       return;
@@ -85,7 +85,7 @@ export default function MarkAttendance() {
   };
 
   const processScan = async () => {
-    if (!faceRec.videoRef.current || !faceRec.canvasRef.current || !user?.faceDescriptors) return;
+    if (!faceRec.videoRef.current || !faceRec.canvasRef.current) return;
 
     try {
       setSubmitting(true);
@@ -93,25 +93,23 @@ export default function MarkAttendance() {
       // Draw initial box
       await faceRec.drawDetection(faceRec.videoRef.current, faceRec.canvasRef.current);
       
-      // Verify face against stored descriptors
-      const { matched, score, distance } = await faceRec.verifyFace(
-        faceRec.videoRef.current,
-        user.faceDescriptors
-      );
-      
-      // Draw result box
-      await faceRec.drawDetection(faceRec.videoRef.current, faceRec.canvasRef.current, matched);
+      // Capture a live descriptor; the server matches it against the enrolled face.
+      const faceDescriptor = await faceRec.captureDescriptor(faceRec.videoRef.current);
+      if (!faceDescriptor) {
+        throw new Error('No face detected. Move closer to the camera in good lighting and try again.');
+      }
 
-      // We send the score to the backend to make the final decision based on thresholds
       const result = await markAttendance({
         sessionId: selectedSessionId,
-        faceMatchScore: score,
+        faceDescriptor,
         latitude: location?.lat,
         longitude: location?.lng,
         deviceInfo: navigator.userAgent,
       });
 
-      setScanResult(result.status === 'proxy_detected' ? 'failed' : 'success');
+      const verified = result.status !== 'proxy_detected';
+      await faceRec.drawDetection(faceRec.videoRef.current, faceRec.canvasRef.current, verified);
+      setScanResult(verified ? 'success' : 'failed');
       
       if (result.flagged) {
         toast.error(`Attendance flagged: ${result.flagReason}`, { duration: 6000 });
@@ -123,12 +121,12 @@ export default function MarkAttendance() {
       setTimeout(() => {
         faceRec.stopWebcam();
         setIsScanning(false);
+        setSubmitting(false);
       }, 2000);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Scan error:', error);
-      const serverMessage = error.response?.data?.error;
-      toast.error(serverMessage || error.message || 'Failed to process scan');
+      toast.error(getErrorMessage(error, 'Failed to process scan'));
       setScanResult('failed');
       setTimeout(() => {
         faceRec.stopWebcam();

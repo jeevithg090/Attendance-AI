@@ -120,8 +120,9 @@ export function useFaceRecognition() {
     onProgress?: (captured: number) => void
   ): Promise<number[][]> => {
     const descriptors: number[][] = [];
+    const maxAttempts = count * 4;
 
-    for (let i = 0; i < count; i++) {
+    for (let attempt = 0; attempt < maxAttempts && descriptors.length < count; attempt++) {
       // Wait a moment between captures
       await new Promise(resolve => setTimeout(resolve, 800));
 
@@ -129,39 +130,24 @@ export function useFaceRecognition() {
       if (descriptor) {
         descriptors.push(Array.from(descriptor));
         onProgress?.(descriptors.length);
-      } else {
-        i--; // Retry
       }
     }
 
     return descriptors;
   }, [extractDescriptor]);
 
-  // ── Verify Face Against Stored Descriptors ──────────────
-  const verifyFace = useCallback(async (
+  // ── Capture a single live descriptor (for check-in) ─────
+  // Matching against the enrolled descriptors happens on the server.
+  const captureDescriptor = useCallback(async (
     videoElement: HTMLVideoElement,
-    storedDescriptors: number[][],
-    threshold: number = 0.5
-  ): Promise<{ matched: boolean; score: number; distance: number }> => {
-    const descriptor = await extractDescriptor(videoElement);
-    if (!descriptor) {
-      return { matched: false, score: 0, distance: 1 };
+    maxAttempts: number = 5
+  ): Promise<number[] | null> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const descriptor = await extractDescriptor(videoElement);
+      if (descriptor) return Array.from(descriptor);
+      await new Promise(resolve => setTimeout(resolve, 400));
     }
-
-    // Create labeled face descriptors
-    const labeledDescriptors = new faceapi.LabeledFaceDescriptors(
-      'student',
-      storedDescriptors.map(d => new Float32Array(d))
-    );
-
-    const faceMatcher = new faceapi.FaceMatcher([labeledDescriptors], threshold);
-    const match = faceMatcher.findBestMatch(descriptor);
-
-    const distance = match.distance;
-    const score = 1 - distance; // Convert distance to similarity score
-    const matched = match.label !== 'unknown';
-
-    return { matched, score, distance };
+    return null;
   }, [extractDescriptor]);
 
   // ── Draw Detection on Canvas ────────────────────────────
@@ -239,7 +225,7 @@ export function useFaceRecognition() {
     detectFace,
     extractDescriptor,
     captureEnrollmentDescriptors,
-    verifyFace,
+    captureDescriptor,
     drawDetection,
     videoRef,
     canvasRef,
