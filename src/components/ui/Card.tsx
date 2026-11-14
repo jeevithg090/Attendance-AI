@@ -26,14 +26,14 @@ export default function Card({
   className = '',
   gradient = false,
   glass = false,
-  hover = true,
+  hover = false,
   padding = 'md',
   onClick,
 }: CardProps) {
   const baseClasses = `
-    rounded-[var(--radius-xl)] transition-all duration-250
+    rounded-[var(--radius-xl)] transition-all duration-200 shadow-[var(--shadow-sm)]
     ${paddingStyles[padding]}
-    ${hover ? 'hover:translate-y-[-2px] hover:shadow-[var(--shadow-md)]' : ''}
+    ${hover ? 'hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]' : ''}
     ${onClick ? 'cursor-pointer' : ''}
   `;
 
