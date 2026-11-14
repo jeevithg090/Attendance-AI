@@ -12,6 +12,7 @@ export function useAttendance() {
 
   const getStudentStats = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const { data } = await api.get('/attendance/my-stats');
       setIsLoading(false);
@@ -25,6 +26,7 @@ export function useAttendance() {
 
   const getSubjectStats = useCallback(async (subjectId: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const { data } = await api.get(`/attendance/subject/${subjectId}/stats`);
       setIsLoading(false);
@@ -38,6 +40,7 @@ export function useAttendance() {
 
   const getStudentRecords = useCallback(async (studentId: string, subjectId?: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const params = subjectId ? { subjectId } : {};
       const { data } = await api.get(`/attendance/student/${studentId}`, { params });

@@ -2,7 +2,7 @@
 // AttendAI — Student Dashboard
 // ═══════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendance } from '../../hooks/useAttendance';
@@ -10,23 +10,30 @@ import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 import type { StudentDashboardData } from '../../types';
 import { Calendar, Clock, CheckCircle2, AlertCircle, TrendingUp, BookOpen, ScanFace } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export default function StudentDashboard() {
   const { user } = useAuthStore();
-  const { getStudentStats, isLoading } = useAttendance();
+  const { getStudentStats, isLoading, error } = useAttendance();
   const [data, setData] = useState<StudentDashboardData | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      const stats = await getStudentStats();
-      if (stats) setData(stats);
-    };
-    fetchStats();
+  const fetchStats = useCallback(async () => {
+    const stats = await getStudentStats();
+    if (stats) setData(stats);
   }, [getStudentStats]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  if (error && !data) {
+    return <ErrorState message={error} onRetry={fetchStats} />;
+  }
 
   if (isLoading || !data) {
     return <LoadingSpinner variant="skeleton" />;
@@ -46,16 +53,21 @@ export default function StudentDashboard() {
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-[var(--bg-surface)] p-6 rounded-[var(--radius-xl)] border border-[var(--border)] relative overflow-hidden">
         {/* Decorative background */}
-        <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500 rounded-full mix-blend-screen filter blur-[80px] opacity-20" />
+        <div
+          className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500 rounded-full filter blur-[80px] opacity-20 pointer-events-none"
+          aria-hidden="true"
+        />
 
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-[var(--text-muted)] bg-clip-text text-transparent mb-1">
-            Welcome back, {user?.displayName.split(' ')[0]} 👋
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)] mb-1">
+            Welcome back, {user?.displayName.split(' ')[0]}
           </h1>
-          <p className="text-[var(--text-secondary)]">
+          <p className="text-[var(--text-secondary)] text-sm sm:text-base">
             Enrollment ID: <span className="font-mono text-[var(--text-primary)]">{user?.enrollmentId}</span>
-            <span className="mx-2">•</span>
-            {user?.department}
+            <span className="mx-2" aria-hidden="true">
+              •
+            </span>
+            <span className="whitespace-nowrap">{user?.department}</span>
           </p>
         </div>
 
@@ -65,21 +77,25 @@ export default function StudentDashboard() {
               <p className="text-sm text-[var(--text-muted)] font-medium mb-0.5">Overall Attendance</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold font-mono tracking-tight text-[var(--text-primary)]">
-                  {overallPercentage}%
+                  {totalClassesHeld === 0 ? '—' : `${overallPercentage}%`}
                 </span>
-                <Badge
-                  variant={
-                    overallPercentage >= 75 ? 'present' : overallPercentage >= 65 ? 'warning' : 'absent'
-                  }
-                  size="sm"
-                >
-                  {overallPercentage >= 75 ? 'Good' : 'Needs attention'}
-                </Badge>
+                {totalClassesHeld === 0 ? (
+                  <Badge size="sm">No classes yet</Badge>
+                ) : (
+                  <Badge
+                    variant={
+                      overallPercentage >= 75 ? 'present' : overallPercentage >= 65 ? 'warning' : 'absent'
+                    }
+                    size="sm"
+                  >
+                    {overallPercentage >= 75 ? 'Good' : 'Needs attention'}
+                  </Badge>
+                )}
               </div>
             </div>
 
             {/* Circular progress */}
-            <div className="relative w-14 h-14">
+            <div className="relative w-14 h-14" aria-hidden="true">
               <svg className="w-full h-full transform -rotate-90">
                 <circle
                   cx="28"
@@ -124,8 +140,11 @@ export default function StudentDashboard() {
               <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse-dot" />
-                    <h2 className="text-lg font-bold text-white">Active Session Available!</h2>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse-dot"
+                      aria-hidden="true"
+                    />
+                    <h2 className="text-lg font-bold text-[var(--text-primary)]">Active session available</h2>
                   </div>
                   <p className="text-[var(--text-secondary)] text-sm">
                     A teacher has opened an attendance session.
@@ -133,8 +152,8 @@ export default function StudentDashboard() {
                 </div>
                 <Button
                   size="lg"
-                  icon={<ScanFace size={20} />}
-                  className="shrink-0 animate-pulse-glow"
+                  icon={<ScanFace size={20} aria-hidden="true" />}
+                  className="shrink-0"
                   onClick={() => navigate('/student/mark-attendance')}
                 >
                   Mark Attendance Now
@@ -142,12 +161,13 @@ export default function StudentDashboard() {
               </div>
             </Card>
           ) : (
-            <Card padding="lg" className="border-dashed border-2 bg-transparent text-center">
-              <div className="w-12 h-12 rounded-full bg-[var(--bg-elevated)] mx-auto flex items-center justify-center mb-3">
-                <Clock className="text-[var(--text-muted)]" size={24} />
-              </div>
-              <h3 className="text-[var(--text-primary)] font-medium mb-1">No Active Sessions</h3>
-              <p className="text-sm text-[var(--text-muted)]">Check back when your class starts.</p>
+            <Card padding="none" className="border-dashed border-2">
+              <EmptyState
+                icon={<Clock size={24} />}
+                title="No active sessions"
+                description="When your teacher opens an attendance session it will appear here."
+                className="py-8"
+              />
             </Card>
           )}
 
@@ -155,7 +175,7 @@ export default function StudentDashboard() {
           <Card>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <BookOpen className="text-indigo-400" size={20} />
+                <BookOpen className="text-indigo-400" size={20} aria-hidden="true" />
                 Subject Attendance
               </h2>
               <Button variant="ghost" size="sm" onClick={() => navigate('/student/my-attendance')}>
@@ -165,11 +185,17 @@ export default function StudentDashboard() {
 
             <div className="space-y-5">
               {data.subjectAttendance.length === 0 ? (
-                <p className="text-[var(--text-muted)] text-sm text-center py-4">No subjects enrolled yet.</p>
+                <EmptyState
+                  icon={<BookOpen size={24} />}
+                  title="No subjects yet"
+                  description="Your teachers will enrol you in their subjects."
+                  className="py-6"
+                />
               ) : (
                 data.subjectAttendance.map((subject) => {
-                  const isLow = subject.percentage < 75;
-                  const isCritical = subject.percentage < 65;
+                  const noClasses = subject.totalClasses === 0;
+                  const isLow = !noClasses && subject.percentage < 75;
+                  const isCritical = !noClasses && subject.percentage < 65;
 
                   return (
                     <div key={subject.subjectId} className="group">
@@ -183,24 +209,39 @@ export default function StudentDashboard() {
                         <div className="text-right">
                           <span
                             className={`text-lg font-bold font-mono ${
-                              isCritical ? 'text-rose-400' : isLow ? 'text-amber-400' : 'text-emerald-400'
+                              noClasses
+                                ? 'text-[var(--text-muted)] text-sm'
+                                : isCritical
+                                  ? 'text-rose-400'
+                                  : isLow
+                                    ? 'text-amber-400'
+                                    : 'text-emerald-400'
                             }`}
                           >
-                            {subject.percentage}%
+                            {noClasses ? '—' : `${subject.percentage}%`}
                           </span>
                           <p className="text-xs text-[var(--text-muted)]">
-                            {subject.attended} / {subject.totalClasses} classes
+                            {noClasses
+                              ? 'No classes yet'
+                              : `${subject.attended} / ${subject.totalClasses} classes`}
                           </p>
                         </div>
                       </div>
 
                       {/* Progress bar */}
-                      <div className="h-2 w-full bg-[var(--bg-elevated)] rounded-full overflow-hidden">
+                      <div
+                        className="h-2 w-full bg-[var(--bg-elevated)] rounded-full overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={noClasses ? 0 : subject.percentage}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${subject.subjectName} attendance`}
+                      >
                         <div
                           className={`h-full rounded-full transition-all duration-1000 ${
                             isCritical ? 'bg-rose-500' : isLow ? 'bg-amber-500' : 'bg-emerald-500'
                           }`}
-                          style={{ width: `${Math.max(subject.percentage, 2)}%` }}
+                          style={{ width: noClasses ? '0%' : `${Math.max(subject.percentage, 2)}%` }}
                         />
                       </div>
                     </div>
@@ -215,18 +256,18 @@ export default function StudentDashboard() {
         <div className="space-y-6">
           <Card className="h-full">
             <h2 className="text-lg font-bold flex items-center gap-2 mb-6">
-              <TrendingUp className="text-purple-400" size={20} />
+              <TrendingUp className="text-purple-400" size={20} aria-hidden="true" />
               Recent Activity
             </h2>
 
             <div className="space-y-4">
               {data.recentActivity.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 mx-auto bg-[var(--bg-elevated)] rounded-full flex items-center justify-center mb-3">
-                    <Calendar className="text-[var(--text-muted)]" size={20} />
-                  </div>
-                  <p className="text-[var(--text-muted)] text-sm">No recent attendance records.</p>
-                </div>
+                <EmptyState
+                  icon={<Calendar size={22} />}
+                  title="No attendance yet"
+                  description="Records appear here after your first class."
+                  className="py-6"
+                />
               ) : (
                 data.recentActivity.slice(0, 5).map((record) => {
                   // Find subject name from subjectAttendance data
@@ -237,15 +278,15 @@ export default function StudentDashboard() {
                   return (
                     <div
                       key={record.id}
-                      className="flex gap-4 p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-light)] hover:border-[var(--border)] transition-colors"
+                      className="flex gap-4 p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border)]"
                     >
                       <div className="mt-0.5 shrink-0">
                         {record.status === 'present' ? (
-                          <CheckCircle2 className="text-emerald-500" size={18} />
+                          <CheckCircle2 className="text-emerald-400" size={18} aria-hidden="true" />
                         ) : record.status === 'absent' ? (
-                          <AlertCircle className="text-rose-500" size={18} />
+                          <AlertCircle className="text-rose-400" size={18} aria-hidden="true" />
                         ) : (
-                          <AlertCircle className="text-amber-500" size={18} />
+                          <AlertCircle className="text-amber-400" size={18} aria-hidden="true" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -259,9 +300,11 @@ export default function StudentDashboard() {
                           <span className="text-xs text-[var(--text-muted)]">
                             {format(parseISO(record.date), 'MMM d, yyyy')}
                           </span>
-                          <span className="text-[10px] text-[var(--text-muted)]">•</span>
+                          <span className="text-xs text-[var(--text-muted)]" aria-hidden="true">
+                            •
+                          </span>
                           <span
-                            className={`text-[10px] font-medium uppercase tracking-wider ${
+                            className={`text-xs font-medium uppercase tracking-wider ${
                               record.status === 'present'
                                 ? 'text-emerald-400'
                                 : record.status === 'absent'
@@ -269,7 +312,7 @@ export default function StudentDashboard() {
                                   : 'text-amber-400'
                             }`}
                           >
-                            {record.status}
+                            {record.status === 'proxy_detected' ? 'proxy' : record.status}
                           </span>
                         </div>
                       </div>

@@ -2,7 +2,7 @@
 // AttendAI — Teacher Dashboard
 // ═══════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
@@ -10,10 +10,13 @@ import Card from '../../components/ui/Card';
 import StatCard from '../../components/ui/StatCard';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import { LayoutDashboard, Users, BookMarked, Play, Activity, Clock } from 'lucide-react';
-import api from '../../api/client';
-import { format, parseISO } from 'date-fns';
-import type { Subject } from '../../types';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
+import PageHeader from '../../components/ui/PageHeader';
+import { CalendarCheck, Users, BookMarked, Play, Activity, Clock, RefreshCw } from 'lucide-react';
+import api, { getErrorMessage } from '../../api/client';
+import { format, isToday, parseISO } from 'date-fns';
+import type { AttendanceSession, Subject } from '../../types';
 
 export default function TeacherDashboard() {
   const { user } = useAuthStore();
@@ -22,56 +25,70 @@ export default function TeacherDashboard() {
   const [stats, setStats] = useState<{
     totalSubjects: number;
     totalStudents: number;
+    sessionsToday: number;
     subjects: Subject[];
   } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    setError(null);
+    try {
+      const [subjectsRes, sessionsRes] = await Promise.all([
+        api.get('/subjects/my-subjects'),
+        api.get('/sessions', { params: { limit: 100 } }),
+      ]);
+      const subjects: Subject[] = subjectsRes.data.data;
+      const sessions: AttendanceSession[] = sessionsRes.data.data;
+
+      setStats({
+        totalSubjects: subjects.length,
+        totalStudents: subjects.reduce((sum, s) => sum + (s.enrolledCount || 0), 0),
+        sessionsToday: sessions.filter((s) => isToday(parseISO(s.startTime))).length,
+        subjects: subjects.slice(0, 3),
+      });
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load your dashboard'));
+    }
+  }, []);
 
   useEffect(() => {
-    if (user) {
-      fetchTeacherSessions(user.id);
+    if (!user) return;
+    fetchTeacherSessions(user.id);
+    fetchStats();
+  }, [user, fetchTeacherSessions, fetchStats]);
 
-      // Fetch some teacher specific stats
-      const fetchStats = async () => {
-        try {
-          const { data } = await api.get('/subjects/my-subjects');
-          const subjects: Subject[] = data.data;
+  const header = (
+    <PageHeader
+      title="Teacher Dashboard"
+      description="Manage your classes and monitor attendance."
+      actions={
+        <Button
+          variant="primary"
+          icon={<Play size={18} aria-hidden="true" />}
+          onClick={() => navigate('/teacher/take-attendance')}
+        >
+          Start session
+        </Button>
+      }
+    />
+  );
 
-          let totalStudents = 0;
-          subjects.forEach((s) => (totalStudents += s.enrolledCount || 0));
+  if (error) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <ErrorState message={error} onRetry={fetchStats} />
+      </div>
+    );
+  }
 
-          setStats({
-            totalSubjects: subjects.length,
-            totalStudents,
-            subjects: subjects.slice(0, 3), // Top 3
-          });
-        } catch {
-          /* ignore */
-        }
-      };
-
-      fetchStats();
-    }
-  }, [user, fetchTeacherSessions]);
-
-  if (isLoading || !stats) {
+  if (!stats) {
     return <LoadingSpinner variant="skeleton" />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">Manage your classes and monitor attendance.</p>
-        </div>
-        <Button
-          variant="primary"
-          icon={<Play size={18} />}
-          onClick={() => navigate('/teacher/take-attendance')}
-          className="animate-pulse-glow hidden sm:flex"
-        >
-          Start Session
-        </Button>
-      </div>
+      {header}
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -88,15 +105,15 @@ export default function TeacherDashboard() {
           variant="primary"
         />
         <StatCard
-          title="Total Students"
+          title="Total Enrolments"
           value={stats.totalStudents}
           icon={<Users size={20} />}
           variant="info"
         />
         <StatCard
-          title="Classes Today"
-          value={0} // Demo static
-          icon={<LayoutDashboard size={20} />}
+          title="Sessions Today"
+          value={stats.sessionsToday}
+          icon={<CalendarCheck size={20} />}
           variant="warning"
         />
       </div>
@@ -107,24 +124,31 @@ export default function TeacherDashboard() {
           <Card>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Active Attendance Sessions</h2>
-              <Button variant="ghost" size="sm" onClick={() => fetchTeacherSessions(user!.id)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<RefreshCw size={14} aria-hidden="true" className={isLoading ? 'animate-spin' : ''} />}
+                onClick={() => fetchTeacherSessions(user!.id)}
+                disabled={isLoading}
+              >
                 Refresh
               </Button>
             </div>
 
             {activeSessions.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mx-auto mb-4">
-                  <Clock size={32} className="text-[var(--text-muted)]" />
-                </div>
-                <p className="text-[var(--text-primary)] font-medium mb-1">No active sessions</p>
-                <p className="text-sm text-[var(--text-muted)] mb-6">
-                  Start a new attendance session for your class.
-                </p>
-                <Button onClick={() => navigate('/teacher/take-attendance')} icon={<Play size={18} />}>
-                  Start New Session
-                </Button>
-              </div>
+              <EmptyState
+                icon={<Clock size={26} />}
+                title="No active sessions"
+                description="Start a new attendance session when your class begins."
+                action={
+                  <Button
+                    onClick={() => navigate('/teacher/take-attendance')}
+                    icon={<Play size={18} aria-hidden="true" />}
+                  >
+                    Start new session
+                  </Button>
+                }
+              />
             ) : (
               <div className="space-y-4">
                 {activeSessions.map((session) => (
@@ -132,11 +156,14 @@ export default function TeacherDashboard() {
                     key={session.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] relative overflow-hidden group"
                   >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" aria-hidden="true" />
 
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-dot" />
+                        <span
+                          className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-dot"
+                          aria-hidden="true"
+                        />
                         <h3 className="font-bold text-[var(--text-primary)]">{session.subjectName}</h3>
                       </div>
                       <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
@@ -179,7 +206,12 @@ export default function TeacherDashboard() {
             </div>
 
             {stats.subjects.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)] text-center py-4">No subjects assigned yet.</p>
+              <EmptyState
+                icon={<BookMarked size={24} />}
+                title="No subjects yet"
+                description="Create a subject and enrol students to start taking attendance."
+                className="py-6"
+              />
             ) : (
               <div className="space-y-4">
                 {stats.subjects.map((subject) => (
@@ -191,7 +223,7 @@ export default function TeacherDashboard() {
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-xs font-mono text-[var(--text-muted)]">{subject.code}</span>
                       <span className="text-xs px-2 py-1 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
-                        {subject.enrolledCount} Students
+                        {subject.enrolledCount} {subject.enrolledCount === 1 ? 'student' : 'students'}
                       </span>
                     </div>
                   </div>

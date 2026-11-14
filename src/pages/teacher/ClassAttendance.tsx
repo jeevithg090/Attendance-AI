@@ -2,13 +2,16 @@
 // AttendAI — Class Attendance (Teacher)
 // ═══════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Card from '../../components/ui/Card';
 import Table from '../../components/ui/Table';
 import Badge from '../../components/ui/Badge';
-import api from '../../api/client';
+import Button from '../../components/ui/Button';
+import ErrorState from '../../components/ui/ErrorState';
+import PageHeader from '../../components/ui/PageHeader';
+import api, { getErrorMessage } from '../../api/client';
+import { downloadCsv, slugify, todayStamp, toCsv } from '../../lib/csv';
 import { FileBarChart, Filter, Download } from 'lucide-react';
-import toast from 'react-hot-toast';
 import type { StudentAttendanceStat, Subject } from '../../types';
 import type { BadgeVariant } from '../../components/ui/Badge';
 
@@ -16,69 +19,53 @@ export default function ClassAttendance() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [stats, setStats] = useState<StudentAttendanceStat[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        const { data } = await api.get('/subjects/my-subjects');
-        setSubjects(data.data);
-        if (data.data.length > 0) {
-          setSelectedSubject(data.data[0].id);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    fetchSubjects();
+  const fetchSubjects = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/subjects/my-subjects');
+      setSubjects(data.data);
+      if (data.data.length > 0) setSelectedSubject((current) => current || data.data[0].id);
+      else setIsLoading(false);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load your subjects'));
+      setIsLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
+  const fetchStats = useCallback(async () => {
     if (!selectedSubject) return;
-
-    const fetchStats = async () => {
-      setIsLoading(true);
-      try {
-        const { data } = await api.get(`/attendance/subject/${selectedSubject}/stats`);
-        setStats(data.data);
-      } catch {
-        toast.error('Failed to load class statistics');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStats();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get(`/attendance/subject/${selectedSubject}/stats`);
+      setStats(data.data);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load class statistics'));
+    } finally {
+      setIsLoading(false);
+    }
   }, [selectedSubject]);
+
+  useEffect(() => {
+    fetchSubjects();
+  }, [fetchSubjects]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const handleExportCSV = () => {
     if (stats.length === 0) return;
-
     const subjectName = subjects.find((s) => s.id === selectedSubject)?.name || 'subject';
-    const csvContent = [
-      ['Student Name', 'Enrollment ID', 'Total Present', 'Total Classes', 'Percentage'],
-      ...stats.map((s) => [
-        s.displayName,
-        s.enrollmentId,
-        s.totalPresent,
-        s.totalClasses,
-        `${s.percentage}%`,
-      ]),
-    ]
-      .map((e) => e.join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute(
-      'download',
-      `attendance_${subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`,
+    const csv = toCsv(
+      ['Student Name', 'Enrollment ID', 'Classes Attended', 'Total Classes', 'Percentage'],
+      stats.map((s) => [s.displayName, s.enrollmentId, s.totalPresent, s.totalClasses, `${s.percentage}%`]),
     );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`attendance_${slugify(subjectName)}_${todayStamp()}.csv`, csv);
   };
 
   const columns = [
@@ -134,40 +121,37 @@ export default function ClassAttendance() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
-            <FileBarChart size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Class Attendance</h1>
-            <p className="text-[var(--text-muted)] text-sm mt-1">
-              View overall attendance stats for your subjects.
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={handleExportCSV}
-          disabled={stats.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] hover:border-[var(--border)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          <Download size={16} />
-          Export CSV
-        </button>
-      </div>
+      <PageHeader
+        icon={<FileBarChart size={24} />}
+        title="Class Attendance"
+        description="Attendance percentage per student for each of your subjects."
+        actions={
+          <Button
+            variant="outline"
+            icon={<Download size={16} aria-hidden="true" />}
+            onClick={handleExportCSV}
+            disabled={stats.length === 0 || isLoading}
+          >
+            Export CSV
+          </Button>
+        }
+      />
 
       <Card padding="none">
-        <div className="p-4 border-b border-[var(--border)] flex flex-wrap gap-4 items-center bg-[var(--bg-elevated)] rounded-t-[var(--radius-xl)]">
-          <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-            <Filter size={16} />
-            <span className="text-sm font-medium">Select Subject:</span>
-          </div>
-
+        <div className="toolbar">
+          <label
+            htmlFor="class-subject"
+            className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]"
+          >
+            <Filter size={16} aria-hidden="true" />
+            Subject
+          </label>
           <select
-            className="input w-auto min-w-[250px]"
+            id="class-subject"
+            className="input sm:w-auto sm:min-w-[260px]"
             value={selectedSubject}
             onChange={(e) => setSelectedSubject(e.target.value)}
+            disabled={subjects.length === 0}
           >
             {subjects.length === 0 && <option value="">No subjects assigned</option>}
             {subjects.map((s) => (
@@ -178,14 +162,28 @@ export default function ClassAttendance() {
           </select>
         </div>
 
-        <Table
-          columns={columns}
-          data={stats}
-          keyExtractor={(s) => s.studentId}
-          isLoading={isLoading}
-          emptyMessage="No students enrolled in this subject yet."
-          rowClassName={(s) => (s.percentage < 65 ? 'row-absent' : '')}
-        />
+        {error ? (
+          <ErrorState
+            message={error}
+            onRetry={selectedSubject ? fetchStats : fetchSubjects}
+            className="border-0 rounded-none"
+          />
+        ) : (
+          <Table
+            columns={columns}
+            data={stats}
+            keyExtractor={(s) => s.studentId}
+            isLoading={isLoading}
+            emptyMessage="No students enrolled in this subject yet."
+            rowClassName={(s) => (s.percentage < 65 ? 'row-absent' : '')}
+            caption="Student attendance for the selected subject"
+            emptyDescription={
+              subjects.length === 0
+                ? 'Create a subject under Manage Subjects first.'
+                : 'Enrol students from Manage Subjects.'
+            }
+          />
+        )}
       </Card>
     </div>
   );

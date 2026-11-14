@@ -2,35 +2,53 @@
 // AttendAI — Admin Dashboard
 // ═══════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CustomStatCard from '../../components/ui/StatCard';
 import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
+import ErrorState from '../../components/ui/ErrorState';
+import PageHeader from '../../components/ui/PageHeader';
 import { Users, BookMarked, Activity, ShieldAlert, GraduationCap, UserCog } from 'lucide-react';
-import api from '../../api/client';
+import api, { getErrorMessage } from '../../api/client';
 import type { AdminDashboardStats } from '../../types';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const { data } = await api.get('/attendance/dashboard/stats');
-        setStats(data.data);
-      } catch {
-        /* ignore */
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStats();
+  const fetchStats = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/attendance/dashboard/stats');
+      setStats(data.data);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load dashboard statistics'));
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const header = (
+    <PageHeader title="Admin Dashboard" description="System overview and campus-wide metrics." />
+  );
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <ErrorState message={error} onRetry={fetchStats} />
+      </div>
+    );
+  }
 
   if (isLoading || !stats) {
     return <LoadingSpinner variant="skeleton" />;
@@ -38,12 +56,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">System overview and campus-wide metrics.</p>
-        </div>
-      </div>
+      {header}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <CustomStatCard
@@ -74,15 +87,15 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="flex flex-col items-center justify-center py-12 text-center">
+        <Card className="flex flex-col items-center justify-center py-10 text-center">
           <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center mb-4">
-            <Users size={32} />
+            <Users size={32} aria-hidden="true" />
           </div>
-          <h3 className="text-lg font-bold mb-2">User Management</h3>
+          <h2 className="text-lg font-bold mb-2">User Management</h2>
           <p className="text-sm text-[var(--text-muted)] mb-6 max-w-sm">
-            Add new students and teachers, reset passwords, and manage enrollments.
+            Register students and teachers, search the directory and export account lists.
           </p>
-          <div className="flex gap-4 w-full px-8">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:px-4">
             <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/manage-students')}>
               Manage Students
             </Button>
@@ -92,15 +105,15 @@ export default function AdminDashboard() {
           </div>
         </Card>
 
-        <Card className="flex flex-col items-center justify-center py-12 text-center">
+        <Card className="flex flex-col items-center justify-center py-10 text-center">
           <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-4">
-            <BookMarked size={32} />
+            <BookMarked size={32} aria-hidden="true" />
           </div>
-          <h3 className="text-lg font-bold mb-2">System Operations</h3>
+          <h2 className="text-lg font-bold mb-2">System Operations</h2>
           <p className="text-sm text-[var(--text-muted)] mb-6 max-w-sm">
             Configure geofencing, update face match thresholds, and view campus-wide reports.
           </p>
-          <div className="flex gap-4 w-full px-8">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:px-4">
             <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/system-settings')}>
               System Settings
             </Button>

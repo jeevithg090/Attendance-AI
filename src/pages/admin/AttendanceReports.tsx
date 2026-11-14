@@ -1,34 +1,42 @@
 // ═══════════════════════════════════════════════════════════
 // AttendAI — Attendance Reports (Admin)
+// Campus-wide reporting is not built yet; point admins at what exists today.
 // ═══════════════════════════════════════════════════════════
 
+import { Link } from 'react-router-dom';
+import { Construction, FileBarChart } from 'lucide-react';
 import Card from '../../components/ui/Card';
-import { FileBarChart, Construction } from 'lucide-react';
+import EmptyState from '../../components/ui/EmptyState';
+import PageHeader from '../../components/ui/PageHeader';
 
 export default function AttendanceReports() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
-          <FileBarChart size={24} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">System Reports</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">
-            Generate and export campus-wide attendance analytics.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<FileBarChart size={24} />}
+        title="System Reports"
+        description="Campus-wide attendance analytics."
+      />
 
-      <Card className="flex flex-col items-center justify-center py-20 text-center border-dashed border-2 bg-transparent">
-        <div className="w-20 h-20 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mb-6">
-          <Construction size={40} className="text-[var(--text-muted)] animate-pulse" />
-        </div>
-        <h2 className="text-xl font-bold mb-2">Reports Module Under Construction</h2>
-        <p className="text-[var(--text-muted)] max-w-md mx-auto">
-          We're currently building advanced analytics including department-wise trends, proxy attempt
-          heatmaps, and automated PDF report generation. Check back in the next update!
-        </p>
+      <Card className="border-dashed border-2">
+        <EmptyState
+          icon={<Construction size={28} />}
+          title="Campus-wide reports are not available yet"
+          description={
+            <>
+              Department trends and scheduled report exports are planned. Today, the{' '}
+              <Link
+                to="/admin"
+                className="font-medium text-[var(--accent-primary)] underline-offset-2 hover:underline"
+              >
+                dashboard
+              </Link>{' '}
+              shows live campus metrics, teachers can export per-subject attendance as CSV, and the student
+              and teacher directories can be exported from their pages.
+            </>
+          }
+          className="py-16"
+        />
       </Card>
     </div>
   );

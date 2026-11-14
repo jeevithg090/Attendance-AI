@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useFaceRecognition } from '../../hooks/useFaceRecognition';
 import Card from '../../components/ui/Card';
+import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import { User, Phone, Mail, Building, Hash, Camera, AlertCircle, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -113,15 +114,11 @@ export default function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
-          <User size={24} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">My Profile</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">Manage your account details and security.</p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<User size={24} />}
+        title="My Profile"
+        description="Your account details and face enrolment."
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left Column - Details */}
@@ -148,11 +145,15 @@ export default function Profile() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  <label
+                    htmlFor={isEditing ? 'profile-full-name' : undefined}
+                    className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1"
+                  >
                     Full Name
                   </label>
                   {isEditing ? (
                     <input
+                      id="profile-full-name"
                       type="text"
                       className="input"
                       value={formData.displayName}
@@ -167,9 +168,9 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  <p className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
                     Email Address
-                  </label>
+                  </p>
                   <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)] opacity-70 cursor-not-allowed">
                     <Mail size={16} className="text-[var(--text-muted)]" />
                     {user.email}
@@ -177,13 +178,13 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  <p className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
                     {user.role === 'student'
                       ? 'Enrollment ID'
                       : user.role === 'teacher'
                         ? 'Employee ID'
                         : 'Admin ID'}
-                  </label>
+                  </p>
                   <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)] opacity-70 cursor-not-allowed">
                     <Hash size={16} className="text-[var(--text-muted)]" />
                     {user.enrollmentId || user.employeeId || 'N/A'}
@@ -191,11 +192,15 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  <label
+                    htmlFor={isEditing ? 'profile-phone-number' : undefined}
+                    className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1"
+                  >
                     Phone Number
                   </label>
                   {isEditing ? (
                     <input
+                      id="profile-phone-number"
                       type="tel"
                       className="input"
                       value={formData.phone}
@@ -211,9 +216,9 @@ export default function Profile() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  <p className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
                     Department
-                  </label>
+                  </p>
                   <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)] opacity-70 cursor-not-allowed">
                     <Building size={16} className="text-[var(--text-muted)]" />
                     {user.department || 'N/A'}
@@ -238,8 +243,8 @@ export default function Profile() {
           </Card>
 
           <Card>
-            <h2 className="text-lg font-semibold mb-4 border-b border-[var(--border)] pb-2">
-              Biometric Data
+            <h2 className="text-lg font-semibold mb-4 border-b border-[var(--border)] pb-3">
+              Biometric data
             </h2>
 
             {!isEnrollingFace ? (
@@ -249,7 +254,7 @@ export default function Profile() {
                     {user.faceEnrolled ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
                   </div>
                   <div>
-                    <h4 className="font-medium">Face Recognition</h4>
+                    <h3 className="font-medium">Face recognition</h3>
                     <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
                       {user.faceEnrolled
                         ? 'Your face data is registered and active for attendance verification.'
@@ -271,12 +276,16 @@ export default function Profile() {
               <div className="space-y-4">
                 <div className="relative rounded-lg overflow-hidden bg-black aspect-[4/3]">
                   {faceRec.isLoading ? (
-                    <div className="absolute inset-0 flex items-center justify-center text-indigo-400">
+                    <div
+                      className="absolute inset-0 flex items-center justify-center text-white/80"
+                      role="status"
+                    >
                       <span className="animate-pulse text-sm">Initializing camera...</span>
                     </div>
                   ) : (
                     <>
                       <video
+                        aria-label="Camera preview"
                         ref={faceRec.videoRef}
                         autoPlay
                         muted
@@ -287,13 +296,22 @@ export default function Profile() {
                       {enrollmentStatus === 'capturing' && (
                         <div className="absolute inset-0 border-4 border-indigo-500/50 flex flex-col items-center justify-end p-4 bg-gradient-to-t from-black/80 to-transparent">
                           <p className="text-white font-medium mb-2">Look straight at the camera</p>
-                          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="w-full h-2 bg-white/20 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-valuenow={enrollmentProgress}
+                            aria-valuemin={0}
+                            aria-valuemax={5}
+                            aria-label="Face captures"
+                          >
                             <div
                               className="h-full bg-indigo-500 transition-all duration-300"
                               style={{ width: `${(enrollmentProgress / 5) * 100}%` }}
                             />
                           </div>
-                          <p className="text-xs text-indigo-300 mt-2">{enrollmentProgress} of 5 captures</p>
+                          <p className="text-xs text-white/80 mt-2" aria-live="polite">
+                            {enrollmentProgress} of 5 captures
+                          </p>
                         </div>
                       )}
 
@@ -308,7 +326,11 @@ export default function Profile() {
 
                       {enrollmentStatus === 'success' && (
                         <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center backdrop-blur-sm">
-                          <CheckCircle2 className="text-emerald-500" size={48} />
+                          <CheckCircle2
+                            className="text-white drop-shadow"
+                            size={48}
+                            aria-label="Face data saved"
+                          />
                         </div>
                       )}
                     </>
