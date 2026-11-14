@@ -37,3 +37,14 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+/** Extract a human-readable message from an API (axios) or runtime error. */
+export function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const apiError = (error.response?.data as { error?: unknown } | undefined)?.error;
+    if (typeof apiError === 'string' && apiError) return apiError;
+    if (!error.response) return 'Unable to reach the server. Check your connection and try again.';
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}

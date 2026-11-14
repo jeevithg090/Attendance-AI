@@ -2,9 +2,8 @@
 // AttendAI — Take Attendance (Teacher)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useSSE } from '../../hooks/useSSE';
 import Card from '../../components/ui/Card';
@@ -12,16 +11,16 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Table from '../../components/ui/Table';
 import Modal from '../../components/ui/Modal';
-import api from '../../api/client';
-import type { AttendanceRecord } from '../../types';
-import { Play, Square, Users, CheckCircle2, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
+import api, { getErrorMessage } from '../../api/client';
+import type { AttendanceRecord, AttendanceSession, Subject } from '../../types';
+import { Play, Square, Users, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { BadgeVariant } from '../../components/ui/Badge';
 
 export default function TakeAttendance() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionIdParam = searchParams.get('sessionId');
   
-  const { user } = useAuthStore();
   const { 
     currentSession, 
     setCurrentSession, 
@@ -32,7 +31,7 @@ export default function TakeAttendance() {
     overrideAttendance
   } = useAttendanceStore();
   
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   
@@ -48,15 +47,19 @@ export default function TakeAttendance() {
     enabled: !!currentSession && currentSession.status === 'active',
   });
 
-  // Handle SSE new record
+  // Handle live SSE events
   useEffect(() => {
-    if (lastEvent && lastEvent.type === 'new_record' && currentSession) {
+    if (!lastEvent || !currentSession) return;
+    if (lastEvent.type === 'new_record' || lastEvent.type === 'record_updated') {
       fetchSessionRecords(currentSession.id);
-      // Optional: show toast for flags
-      if (lastEvent.data?.flagged) {
-        toast.error(`Flagged attendance: ${lastEvent.data.studentName}`, { id: 'flagged-alert' });
+      if (lastEvent.type === 'new_record' && lastEvent.data?.flagged) {
+        toast.error(`Flagged attendance: ${String(lastEvent.data.studentName)}`, { id: 'flagged-alert' });
       }
+    } else if (lastEvent.type === 'session_closed' && lastEvent.data) {
+      setCurrentSession(lastEvent.data as unknown as AttendanceSession);
+      fetchSessionRecords(currentSession.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react only to new events
   }, [lastEvent]);
 
   // Load initial data
@@ -99,8 +102,8 @@ export default function TakeAttendance() {
       const session = await createSession(selectedSubject);
       setSearchParams({ sessionId: session.id });
       toast.success('Session started successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to start session');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to start session'));
     } finally {
       setIsCreating(false);
     }
@@ -117,8 +120,8 @@ export default function TakeAttendance() {
         const { data } = await api.get(`/sessions/${currentSession.id}`);
         setCurrentSession(data.data);
         fetchSessionRecords(currentSession.id);
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to close session');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Failed to close session'));
       }
     }
   };
@@ -141,8 +144,8 @@ export default function TakeAttendance() {
       await overrideAttendance(overrideRecord.id, overrideStatus, overrideReason);
       toast.success('Attendance overridden successfully');
       setIsOverrideModalOpen(false);
-    } catch (error: any) {
-      toast.error('Failed to override attendance');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to override attendance'));
     } finally {
       setIsOverriding(false);
     }
@@ -163,7 +166,7 @@ export default function TakeAttendance() {
       key: 'status',
       header: 'Status',
       render: (r: AttendanceRecord) => {
-        let variant: any = 'default';
+        let variant: BadgeVariant = 'default';
         if (r.status === 'present') variant = 'present';
         else if (r.status === 'absent') variant = 'absent';
         else if (r.status === 'late') variant = 'late';

@@ -1,60 +1,67 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — SSE Hook (Server-Sent Events)
-// ═══════════════════════════════════════════════════════════
+// Server-Sent Events hook with automatic reconnection.
+import { useEffect, useRef, useState } from 'react';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+export interface SSEEvent {
+  type: string;
+  data?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 interface SSEOptions {
   url: string;
-  onMessage?: (data: any) => void;
+  onMessage?: (event: SSEEvent) => void;
   enabled?: boolean;
+  reconnectDelayMs?: number;
 }
 
-export function useSSE({ url, onMessage, enabled = true }: SSEOptions) {
+export function useSSE({ url, onMessage, enabled = true, reconnectDelayMs = 5000 }: SSEOptions) {
   const [isConnected, setIsConnected] = useState(false);
-  const [lastEvent, setLastEvent] = useState<any>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-
-  const connect = useCallback(() => {
-    if (!enabled) return;
-
-    const token = localStorage.getItem('attendai_token');
-    const fullUrl = `${url}${url.includes('?') ? '&' : '?'}token=${token}`;
-
-    const eventSource = new EventSource(fullUrl);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onopen = () => {
-      setIsConnected(true);
-    };
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setLastEvent(data);
-        onMessage?.(data);
-      } catch {
-        console.error('SSE parse error');
-      }
-    };
-
-    eventSource.onerror = () => {
-      setIsConnected(false);
-      eventSource.close();
-      // Reconnect after 5 seconds
-      setTimeout(connect, 5000);
-    };
-  }, [url, onMessage, enabled]);
-
-  const disconnect = useCallback(() => {
-    eventSourceRef.current?.close();
-    setIsConnected(false);
-  }, []);
+  const [lastEvent, setLastEvent] = useState<SSEEvent | null>(null);
+  const onMessageRef = useRef(onMessage);
 
   useEffect(() => {
-    if (enabled) connect();
-    return () => disconnect();
-  }, [enabled, connect, disconnect]);
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
-  return { isConnected, lastEvent, disconnect };
+  useEffect(() => {
+    if (!enabled || !url) return;
+
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+
+    const connect = () => {
+      // EventSource cannot send an Authorization header, so the JWT goes in the query string.
+      const token = localStorage.getItem('attendai_token') ?? '';
+      const fullUrl = `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+      source = new EventSource(fullUrl);
+
+      source.onopen = () => setIsConnected(true);
+      source.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as SSEEvent;
+          setLastEvent(data);
+          onMessageRef.current?.(data);
+        } catch {
+          console.error('SSE parse error');
+        }
+      };
+      source.onerror = () => {
+        setIsConnected(false);
+        source?.close();
+        if (!disposed) reconnectTimer = setTimeout(connect, reconnectDelayMs);
+      };
+    };
+
+    connect();
+
+    return () => {
+      disposed = true;
+      clearTimeout(reconnectTimer);
+      source?.close();
+      setIsConnected(false);
+    };
+  }, [url, enabled, reconnectDelayMs]);
+
+  return { isConnected, lastEvent };
 }

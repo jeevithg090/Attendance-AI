@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { create } from 'zustand';
-import api from '../api/client';
+import api, { getErrorMessage } from '../api/client';
 import type { User } from '../types';
 
 interface AuthState {
@@ -18,7 +18,7 @@ interface AuthState {
   updateProfile: (data: Partial<User>) => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: JSON.parse(localStorage.getItem('attendai_user') || 'null'),
   token: localStorage.getItem('attendai_token'),
   isLoading: false,
@@ -34,9 +34,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem('attendai_user', JSON.stringify(user));
 
       set({ user, token, isAuthenticated: true, isLoading: false });
-    } catch (error: any) {
+    } catch (error) {
       set({ isLoading: false });
-      throw new Error(error.response?.data?.error || 'Login failed');
+      throw new Error(getErrorMessage(error, 'Login failed'), { cause: error });
     }
   },
 
