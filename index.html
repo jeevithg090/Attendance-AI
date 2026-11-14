@@ -1,22 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AttendAI — Anti-Proxy Attendance</title>
     <meta
       name="description"
       content="AttendAI is an anti-proxy attendance system that verifies students with in-browser face recognition and campus geofencing."
     />
     <meta name="theme-color" content="#0a0f1e" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap"
+    />
+
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AttendAI" />
     <meta property="og:title" content="AttendAI — Anti-Proxy Attendance" />
     <meta
       property="og:description"
       content="Face-verified, geofenced class attendance for students, teachers and administrators."
     />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="AttendAI — Anti-Proxy Attendance" />
+    <meta
+      name="twitter:description"
+      content="Face-verified, geofenced class attendance for students, teachers and administrators."
+    />
+
+    <!-- Apply the saved or system colour theme before first paint (logic mirrors src/lib/theme.ts). -->
+    <script>
+      (function () {
+        var pref = null;
+        try {
+          pref = localStorage.getItem('attendai_theme');
+        } catch (e) {}
+        var dark =
+          pref === 'dark' ||
+          (pref !== 'light' &&
+            (!window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches));
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        if (!dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f5f6fa');
+      })();
+    </script>
   </head>
   <body>
     <noscript>AttendAI requires JavaScript to run.</noscript>
