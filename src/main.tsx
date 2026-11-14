@@ -11,7 +11,7 @@ import { useAuthStore } from './store/authStore';
 import type { UserRole } from './types';
 import './index.css';
 
-// Route-level code splitting keeps face-api.js/recharts out of the initial bundle.
+// Route-level code splitting keeps face-api.js out of the initial bundle.
 const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
