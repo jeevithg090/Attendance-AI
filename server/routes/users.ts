@@ -1,204 +1,86 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — User Management Routes (Admin)
-// ═══════════════════════════════════════════════════════════
-
+// User management routes.
 import { Router } from 'express';
+import { and, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 import { db } from '../db/connection';
 import { users } from '../db/schema';
-import { eq, ilike, and, or, count, desc } from 'drizzle-orm';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { asyncHandler, badRequest, forbidden, isUniqueViolation, notFound } from '../http/errors';
+import {
+  bulkImportSchema,
+  clampInt,
+  faceEnrollmentSchema,
+  queryString,
+  roleSchema,
+  userUpdateSchema,
+  uuidParam,
+} from '../http/validation';
+import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { currentUser, requireRole } from '../middleware/rbac';
 import { hashPassword } from '../services/authService';
+import { getSettings } from '../services/settingsService';
+import { toPublicUser } from '../services/userService';
 
 const router = Router();
-
-// All routes require authentication
 router.use(authenticate);
 
-// ── GET /api/users ───────────────────────────────────────
-router.get('/', requireRole('admin', 'teacher'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const { role, department, search, page = '1', limit = '20' } = req.query;
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-    let query = db.select({
-      id: users.id,
-      email: users.email,
-      displayName: users.displayName,
-      role: users.role,
-      photoUrl: users.photoUrl,
-      phone: users.phone,
-      department: users.department,
-      enrollmentId: users.enrollmentId,
-      employeeId: users.employeeId,
-      faceEnrolled: users.faceEnrolled,
-      isActive: users.isActive,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-    }).from(users).$dynamic();
+// GET /api/users
+router.get(
+  '/',
+  requireRole('admin', 'teacher'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const page = clampInt(req.query.page, 1, 1, 10_000);
+    const pageSize = clampInt(req.query.limit, 20, 1, 200);
+    const role = queryString(req.query.role);
+    const department = queryString(req.query.department);
+    const search = queryString(req.query.search);
 
-    const conditions = [];
-    if (role) conditions.push(eq(users.role, role as string));
-    if (department) conditions.push(eq(users.department, department as string));
+    const conditions: SQL[] = [];
+    if (role) conditions.push(eq(users.role, roleSchema.parse(role)));
+    if (department) conditions.push(eq(users.department, department));
     if (search) {
+      const pattern = `%${escapeLike(search)}%`;
       conditions.push(
-        or(
-          ilike(users.displayName, `%${search}%`),
-          ilike(users.email, `%${search}%`),
-          ilike(users.enrollmentId, `%${search}%`)
-        )!
+        or(ilike(users.displayName, pattern), ilike(users.email, pattern), ilike(users.enrollmentId, pattern))!,
       );
     }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    const result = await query.orderBy(desc(users.createdAt)).limit(limitNum).offset(offset);
-
-    // Count total
-    const [totalResult] = await db.select({ count: count() }).from(users);
+    const rows = await db
+      .select()
+      .from(users)
+      .where(where)
+      .orderBy(desc(users.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+    const [{ total }] = await db.select({ total: count() }).from(users).where(where);
 
     res.json({
       success: true,
       data: {
-        items: result,
-        total: totalResult?.count || 0,
-        page: pageNum,
-        pageSize: limitNum,
-        totalPages: Math.ceil((totalResult?.count || 0) / limitNum),
+        items: rows.map(toPublicUser),
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
       },
     });
-  } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/users/:id ───────────────────────────────────
-router.get('/:id', async (req: AuthenticatedRequest, res) => {
-  try {
-    const [user] = await db.select({
-      id: users.id,
-      email: users.email,
-      displayName: users.displayName,
-      role: users.role,
-      photoUrl: users.photoUrl,
-      phone: users.phone,
-      department: users.department,
-      enrollmentId: users.enrollmentId,
-      employeeId: users.employeeId,
-      faceEnrolled: users.faceEnrolled,
-      faceDescriptors: users.faceDescriptors,
-      isActive: users.isActive,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-    }).from(users).where(eq(users.id, req.params.id)).limit(1);
-
-    if (!user) {
-      res.status(404).json({ success: false, error: 'User not found' });
-      return;
-    }
-
-    res.json({ success: true, data: user });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── PUT /api/users/:id ───────────────────────────────────
-router.put('/:id', requireRole('admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const { displayName, phone, department, isActive, role } = req.body;
-
-    const [updated] = await db.update(users)
-      .set({
-        ...(displayName && { displayName }),
-        ...(phone !== undefined && { phone }),
-        ...(department && { department }),
-        ...(isActive !== undefined && { isActive }),
-        ...(role && { role }),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, req.params.id))
-      .returning();
-
-    if (!updated) {
-      res.status(404).json({ success: false, error: 'User not found' });
-      return;
-    }
-
-    const { passwordHash: _, ...userWithoutPassword } = updated;
-    res.json({ success: true, data: userWithoutPassword });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── DELETE /api/users/:id (soft delete) ──────────────────
-router.delete('/:id', requireRole('admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    await db.update(users)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(users.id, req.params.id));
-
-    res.json({ success: true, message: 'User deactivated' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── POST /api/users/:id/face-descriptors ─────────────────
-router.post('/:id/face-descriptors', async (req: AuthenticatedRequest, res) => {
-  try {
-    const { descriptors } = req.body;
-
-    // Only allow updating own face data or admin
-    if (req.user!.id !== req.params.id && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: 'Not authorized' });
-      return;
-    }
-
-    if (!descriptors || !Array.isArray(descriptors) || descriptors.length === 0) {
-      res.status(400).json({ success: false, error: 'Face descriptors required' });
-      return;
-    }
-
-    const [updated] = await db.update(users)
-      .set({
-        faceDescriptors: descriptors,
-        faceEnrolled: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, req.params.id))
-      .returning();
-
-    res.json({ success: true, data: { faceEnrolled: true, descriptorCount: descriptors.length } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── POST /api/users/bulk-import ──────────────────────────
-router.post('/bulk-import', requireRole('admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const { students } = req.body;
-
-    if (!students || !Array.isArray(students)) {
-      res.status(400).json({ success: false, error: 'Students array required' });
-      return;
-    }
-
+// POST /api/users/bulk-import
+router.post(
+  '/bulk-import',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const { students } = bulkImportSchema.parse(req.body);
     const results = { created: 0, skipped: 0, errors: [] as string[] };
 
     for (const student of students) {
       try {
-        const hashedPassword = await hashPassword(student.password || 'Student@123');
         await db.insert(users).values({
           email: student.email,
-          passwordHash: hashedPassword,
+          passwordHash: await hashPassword(student.password),
           displayName: student.displayName,
           role: 'student',
           department: student.department,
@@ -206,16 +88,94 @@ router.post('/bulk-import', requireRole('admin'), async (req: AuthenticatedReque
           phone: student.phone,
         });
         results.created++;
-      } catch (err: any) {
+      } catch (error) {
         results.skipped++;
-        results.errors.push(`${student.email}: ${err.message}`);
+        results.errors.push(
+          `${student.email}: ${isUniqueViolation(error) ? 'already exists' : 'could not be created'}`,
+        );
       }
     }
 
     res.json({ success: true, data: results });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
+
+// GET /api/users/:id — self, teachers and admins
+router.get(
+  '/:id',
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const id = uuidParam(req.params.id);
+    const me = currentUser(req);
+    if (me.role === 'student' && me.id !== id) throw forbidden();
+
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!user) throw notFound('User not found');
+    res.json({ success: true, data: toPublicUser(user) });
+  }),
+);
+
+// PUT /api/users/:id
+router.put(
+  '/:id',
+  requireRole('admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const id = uuidParam(req.params.id);
+    const input = userUpdateSchema.parse(req.body);
+    if (id === currentUser(req).id && (input.isActive === false || (input.role && input.role !== 'admin'))) {
+      throw badRequest('You cannot deactivate or demote your own account');
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    if (!updated) throw notFound('User not found');
+    res.json({ success: true, data: toPublicUser(updated) });
+  }),
+);
+
+// DELETE /api/users/:id (soft delete)
+router.delete(
+  '/:id',
+  requireRole('admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const id = uuidParam(req.params.id);
+    if (id === currentUser(req).id) throw badRequest('You cannot deactivate your own account');
+
+    const [updated] = await db
+      .update(users)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning({ id: users.id });
+    if (!updated) throw notFound('User not found');
+    res.json({ success: true, message: 'User deactivated' });
+  }),
+);
+
+// POST /api/users/:id/face-descriptors — enrol face (self or admin)
+router.post(
+  '/:id/face-descriptors',
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const id = uuidParam(req.params.id);
+    const me = currentUser(req);
+    if (me.id !== id && me.role !== 'admin') throw forbidden();
+
+    const { descriptors } = faceEnrollmentSchema.parse(req.body);
+    const settings = await getSettings();
+    if (descriptors.length > settings.maxFaceEnrollmentPhotos) {
+      throw badRequest(`At most ${settings.maxFaceEnrollmentPhotos} face samples are allowed`);
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ faceDescriptors: descriptors, faceEnrolled: true, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning({ id: users.id });
+    if (!updated) throw notFound('User not found');
+
+    res.json({ success: true, data: { faceEnrolled: true, descriptorCount: descriptors.length } });
+  }),
+);
 
 export default router;
