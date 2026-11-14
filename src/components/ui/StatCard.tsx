@@ -36,7 +36,11 @@ export default function StatCard({
     }
 
     hasAnimated.current = true;
-    const duration = 1200;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplayValue(value);
+      return;
+    }
+    const duration = 900;
     const startTime = performance.now();
 
     const animate = (currentTime: number) => {
@@ -65,7 +69,9 @@ export default function StatCard({
   return (
     <div className={`stat-card ${variant} animate-fade-in-up ${className}`}>
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-2.5 rounded-[var(--radius-md)] ${iconBgColors[variant]}`}>{icon}</div>
+        <div className={`p-2.5 rounded-[var(--radius-md)] ${iconBgColors[variant]}`} aria-hidden="true">
+          {icon}
+        </div>
         {trend && (
           <div
             className={`flex items-center gap-1 text-xs font-medium ${
@@ -83,9 +89,12 @@ export default function StatCard({
           className="text-2xl font-bold text-[var(--text-primary)] tracking-tight"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          {prefix}
-          {displayValue.toLocaleString()}
-          {suffix}
+          <span aria-hidden="true">
+            {prefix}
+            {displayValue.toLocaleString()}
+            {suffix}
+          </span>
+          <span className="sr-only">{`${prefix}${value.toLocaleString()}${suffix}`}</span>
         </p>
       </div>
     </div>

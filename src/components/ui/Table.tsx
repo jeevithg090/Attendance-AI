@@ -1,8 +1,10 @@
 // ═══════════════════════════════════════════════════════════
-// AttendAI — Table & LoadingSpinner Components
+// AttendAI — Table Component
 // ═══════════════════════════════════════════════════════════
 
 import React from 'react';
+import { Inbox } from 'lucide-react';
+import EmptyState from './EmptyState';
 
 // ── Table ─────────────────────────────────────────────────
 interface Column<T> {
@@ -19,7 +21,11 @@ interface TableProps<T> {
   keyExtractor: (item: T) => string;
   rowClassName?: (item: T) => string;
   emptyMessage?: string;
+  /** Optional secondary line or action shown in the empty state. */
+  emptyDescription?: React.ReactNode;
   isLoading?: boolean;
+  /** Accessible table name (visually hidden). */
+  caption?: string;
 }
 
 export function Table<T>({
@@ -28,16 +34,19 @@ export function Table<T>({
   keyExtractor,
   rowClassName,
   emptyMessage = 'No data found',
+  emptyDescription,
   isLoading,
+  caption,
 }: TableProps<T>) {
   if (isLoading) {
     return (
-      <div className="table-container">
+      <div className="table-container" aria-busy="true">
         <table className="table">
+          {caption && <caption className="sr-only">{caption} (loading)</caption>}
           <thead>
             <tr>
               {columns.map((col) => (
-                <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+                <th key={col.key} scope="col" style={col.width ? { width: col.width } : undefined}>
                   {col.header}
                 </th>
               ))}
@@ -62,20 +71,19 @@ export function Table<T>({
   if (data.length === 0) {
     return (
       <div className="table-container">
-        <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
-          <p className="text-sm">{emptyMessage}</p>
-        </div>
+        <EmptyState icon={<Inbox size={24} />} title={emptyMessage} description={emptyDescription} />
       </div>
     );
   }
 
   return (
     <div className="table-container">
-      <table className="table">
+      <table className="table table-responsive">
+        {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr>
             {columns.map((col) => (
-              <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+              <th key={col.key} scope="col" style={col.width ? { width: col.width } : undefined}>
                 {col.header}
               </th>
             ))}
@@ -85,7 +93,7 @@ export function Table<T>({
           {data.map((item, index) => (
             <tr key={keyExtractor(item)} className={rowClassName?.(item) || ''}>
               {columns.map((col) => (
-                <td key={col.key}>
+                <td key={col.key} data-label={col.header}>
                   {col.render
                     ? col.render(item, index)
                     : String((item as Record<string, unknown>)[col.key] ?? '')}
