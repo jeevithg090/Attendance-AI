@@ -3,12 +3,19 @@
 // ═══════════════════════════════════════════════════════════
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import { Shield, ScanFace, Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Shield, ScanFace, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '../../api/client';
+
+const SHOW_DEMO_LOGINS = import.meta.env.VITE_SHOW_DEMO_LOGINS === 'true';
+const DEMO_ACCOUNTS = {
+  admin: { email: 'admin@bmsce.ac.in', password: 'Admin@123' },
+  teacher: { email: 'teacher1@bmsce.ac.in', password: 'Teacher@123' },
+  student: { email: 'student1@bmsce.ac.in', password: 'Student@123' },
+} as const;
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,7 +24,6 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState<'student' | 'teacher' | 'admin'>('student');
   
   const { login, isLoading } = useAuthStore();
-  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,23 +31,18 @@ export default function Login() {
       await login(email, password);
       toast.success('Logged in successfully!');
       // Redirection handled by main.tsx ProtectedRoute
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to login. Please check credentials.');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to login. Please check credentials.'));
     }
   };
 
-  const handleDemoFill = (role: 'student' | 'teacher' | 'admin') => {
+  // Seeded demo accounts (see `npm run db:seed`). Only pre-filled when explicitly enabled.
+  const handleRoleSelect = (role: 'student' | 'teacher' | 'admin') => {
     setActiveTab(role);
-    if (role === 'admin') {
-      setEmail('admin@bmsce.ac.in');
-      setPassword('Admin@123');
-    } else if (role === 'teacher') {
-      setEmail('teacher1@bmsce.ac.in');
-      setPassword('Teacher@123');
-    } else {
-      setEmail('student1@bmsce.ac.in');
-      setPassword('Student@123');
-    }
+    if (!SHOW_DEMO_LOGINS) return;
+    const demo = DEMO_ACCOUNTS[role];
+    setEmail(demo.email);
+    setPassword(demo.password);
   };
 
   return (
@@ -107,7 +108,8 @@ export default function Login() {
                 <button
                   key={role}
                   type="button"
-                  onClick={() => handleDemoFill(role)}
+                  onClick={() => handleRoleSelect(role)}
+                  aria-pressed={activeTab === role}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 capitalize ${
                     activeTab === role 
                       ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm border border-[var(--border-light)]' 
@@ -121,7 +123,7 @@ export default function Login() {
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                <label htmlFor="login-email" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Email Address
                 </label>
                 <div className="relative">
@@ -129,7 +131,9 @@ export default function Login() {
                     <Mail size={18} className="text-[var(--text-muted)]" />
                   </div>
                   <input
+                    id="login-email"
                     type="email"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -141,18 +145,18 @@ export default function Login() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                  <label htmlFor="login-password" className="block text-sm font-medium text-[var(--text-secondary)]">
                     Password
                   </label>
-                  <a href="#" className="text-xs font-medium text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] transition-colors">
-                    Forgot password?
-                  </a>
+                  <span className="text-xs text-[var(--text-muted)]">Forgot it? Ask your administrator.</span>
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock size={18} className="text-[var(--text-muted)]" />
                   </div>
                   <input
+                    id="login-password"
+                    autoComplete="current-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -164,21 +168,11 @@ export default function Login() {
                     type="button"
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-[var(--border-light)] bg-[var(--bg-elevated)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)] focus:ring-offset-[var(--bg-surface)]"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-[var(--text-secondary)]">
-                  Remember me for 7 days
-                </label>
               </div>
 
               <Button
@@ -201,10 +195,11 @@ export default function Login() {
               </p>
             </div>
             
-            {/* Demo Hint */}
-            <div className="mt-6 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 text-center">
-              💡 <strong>Demo tip:</strong> Click the role tabs above to auto-fill demo credentials.
-            </div>
+            {SHOW_DEMO_LOGINS && (
+              <div className="mt-6 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 text-center">
+                <strong>Demo mode:</strong> click a role tab above to fill in the seeded demo account.
+              </div>
+            )}
           </Card>
         </div>
       </div>

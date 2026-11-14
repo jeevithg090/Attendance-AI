@@ -2,7 +2,7 @@
 // AttendAI — Manage Students (Admin)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Table from '../../components/ui/Table';
@@ -11,9 +11,10 @@ import Badge from '../../components/ui/Badge';
 import api from '../../api/client';
 import { GraduationCap, Search, Plus, Filter, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { User } from '../../types';
 
 export default function ManageStudents() {
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -43,7 +44,7 @@ export default function ManageStudents() {
     {
       key: 'name',
       header: 'Student',
-      render: (s: any) => (
+      render: (s: User) => (
         <div>
           <p className="font-medium text-[var(--text-primary)]">{s.displayName}</p>
           <p className="text-xs text-[var(--text-muted)] font-mono">{s.enrollmentId}</p>
@@ -53,7 +54,7 @@ export default function ManageStudents() {
     {
       key: 'contact',
       header: 'Contact',
-      render: (s: any) => (
+      render: (s: User) => (
         <div>
           <p className="text-sm">{s.email}</p>
           {s.phone && <p className="text-xs text-[var(--text-muted)]">{s.phone}</p>}
@@ -63,12 +64,12 @@ export default function ManageStudents() {
     {
       key: 'department',
       header: 'Department',
-      render: (s: any) => <span className="text-sm">{s.department}</span>
+      render: (s: User) => <span className="text-sm">{s.department}</span>
     },
     {
       key: 'status',
       header: 'Status',
-      render: (s: any) => (
+      render: (s: User) => (
         <Badge variant={s.isActive ? 'present' : 'absent'}>
           {s.isActive ? 'Active' : 'Deactivated'}
         </Badge>
@@ -77,7 +78,7 @@ export default function ManageStudents() {
     {
       key: 'faceEnrolled',
       header: 'Face Data',
-      render: (s: any) => (
+      render: (s: User) => (
         <Badge variant={s.faceEnrolled ? 'present' : 'warning'}>
           {s.faceEnrolled ? 'Enrolled' : 'Pending'}
         </Badge>

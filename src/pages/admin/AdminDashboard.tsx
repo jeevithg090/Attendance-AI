@@ -2,18 +2,18 @@
 // AttendAI — Admin Dashboard
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import StatCard from '../../components/ui/Card'; // Actually use the custom StatCard we built
 import CustomStatCard from '../../components/ui/StatCard';
 import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
-import { LayoutDashboard, Users, BookMarked, Activity, ShieldAlert, GraduationCap, UserCog } from 'lucide-react';
+import { Users, BookMarked, Activity, ShieldAlert, GraduationCap, UserCog } from 'lucide-react';
 import api from '../../api/client';
+import type { AdminDashboardStats } from '../../types';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 

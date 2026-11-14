@@ -2,7 +2,7 @@
 // AttendAI — Manage Teachers (Admin)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Table from '../../components/ui/Table';
@@ -11,9 +11,10 @@ import Badge from '../../components/ui/Badge';
 import api from '../../api/client';
 import { UserCog, Search, Plus, Filter, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { User } from '../../types';
 
 export default function ManageTeachers() {
-  const [teachers, setTeachers] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -43,7 +44,7 @@ export default function ManageTeachers() {
     {
       key: 'name',
       header: 'Teacher Name',
-      render: (t: any) => (
+      render: (t: User) => (
         <div>
           <p className="font-medium text-[var(--text-primary)]">{t.displayName}</p>
           <p className="text-xs text-[var(--text-muted)] font-mono">{t.employeeId}</p>
@@ -53,7 +54,7 @@ export default function ManageTeachers() {
     {
       key: 'contact',
       header: 'Contact',
-      render: (t: any) => (
+      render: (t: User) => (
         <div>
           <p className="text-sm">{t.email}</p>
           {t.phone && <p className="text-xs text-[var(--text-muted)]">{t.phone}</p>}
@@ -63,12 +64,12 @@ export default function ManageTeachers() {
     {
       key: 'department',
       header: 'Department',
-      render: (t: any) => <span className="text-sm">{t.department}</span>
+      render: (t: User) => <span className="text-sm">{t.department}</span>
     },
     {
       key: 'status',
       header: 'Status',
-      render: (t: any) => (
+      render: (t: User) => (
         <Badge variant={t.isActive ? 'present' : 'absent'}>
           {t.isActive ? 'Active' : 'Deactivated'}
         </Badge>

@@ -2,7 +2,6 @@
 // AttendAI — Attendance Reports (Admin)
 // ═══════════════════════════════════════════════════════════
 
-import React from 'react';
 import Card from '../../components/ui/Card';
 import { FileBarChart, Construction } from 'lucide-react';
 

@@ -2,13 +2,17 @@
 // AttendAI — Navbar Component
 // ═══════════════════════════════════════════════════════════
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Bell, LogOut, User, ChevronDown, Menu } from 'lucide-react';
 import api from '../../api/client';
 
-export default function Navbar() {
+interface NavbarProps {
+  onMenuClick?: () => void;
+}
+
+export default function Navbar({ onMenuClick }: NavbarProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -38,9 +42,18 @@ export default function Navbar() {
   };
 
   return (
-    <header className="navbar sticky top-0 z-30 flex items-center justify-between px-6">
+    <header className="navbar sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6">
       {/* Breadcrumb / Title */}
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="lg:hidden p-2 -ml-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]"
+          aria-label="Open navigation menu"
+          aria-controls="app-sidebar"
+        >
+          <Menu size={20} />
+        </button>
         <h2 className="text-sm font-medium text-[var(--text-secondary)]">
           {roleLabel[user?.role || 'student']} Portal
         </h2>

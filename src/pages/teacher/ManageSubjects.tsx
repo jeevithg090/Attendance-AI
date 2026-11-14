@@ -7,18 +7,19 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Table from '../../components/ui/Table';
 import Modal from '../../components/ui/Modal';
-import api from '../../api/client';
+import api, { getErrorMessage } from '../../api/client';
 import { BookMarked, Plus, Users, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { Subject, User } from '../../types';
 
 export default function ManageSubjects() {
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   
-  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   
   const [newSubject, setNewSubject] = useState({
     name: '',
@@ -55,8 +56,8 @@ export default function ManageSubjects() {
       setIsAddModalOpen(false);
       fetchSubjects();
       setNewSubject({ name: '', code: '', department: 'Computer Science', semester: 1 });
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create subject');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to create subject'));
     } finally {
       setIsSubmitting(false);
     }
@@ -78,8 +79,8 @@ export default function ManageSubjects() {
       const inputIds = enrollStudentIds.split(',').map(s => s.trim().toLowerCase());
       
       const matchedIds = allStudents
-        .filter((s: any) => inputIds.includes(s.enrollmentId.toLowerCase()) || inputIds.includes(s.email.toLowerCase()))
-        .map((s: any) => s.id);
+        .filter((s: User) => inputIds.includes((s.enrollmentId ?? '').toLowerCase()) || inputIds.includes(s.email.toLowerCase()))
+        .map((s: User) => s.id);
         
       if (matchedIds.length === 0) {
         toast.error('No valid students found matching those IDs/Emails');
@@ -92,8 +93,8 @@ export default function ManageSubjects() {
       setIsEnrollModalOpen(false);
       setEnrollStudentIds('');
       fetchSubjects();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to enroll students');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to enroll students'));
     } finally {
       setIsSubmitting(false);
     }
@@ -103,28 +104,28 @@ export default function ManageSubjects() {
     {
       key: 'name',
       header: 'Subject Name',
-      render: (s: any) => <span className="font-medium">{s.name}</span>
+      render: (s: Subject) => <span className="font-medium">{s.name}</span>
     },
     {
       key: 'code',
       header: 'Code',
-      render: (s: any) => <span className="font-mono text-sm">{s.code}</span>
+      render: (s: Subject) => <span className="font-mono text-sm">{s.code}</span>
     },
     {
       key: 'semester',
       header: 'Semester',
-      render: (s: any) => <span>Sem {s.semester}</span>
+      render: (s: Subject) => <span>Sem {s.semester}</span>
     },
     {
       key: 'enrolled',
       header: 'Enrolled Students',
-      render: (s: any) => <span className="font-mono">{s.enrolledCount || 0}</span>
+      render: (s: Subject) => <span className="font-mono">{s.enrolledCount || 0}</span>
     },
     {
       key: 'actions',
       header: 'Actions',
       width: '120px',
-      render: (s: any) => (
+      render: (s: Subject) => (
         <Button 
           variant="outline" 
           size="sm" 
