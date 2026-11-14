@@ -15,6 +15,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
+    // face-api.js (TensorFlow.js) is a single ~650 kB chunk that is only loaded on camera pages.
+    chunkSizeWarningLimit: 700,
   },
 });
