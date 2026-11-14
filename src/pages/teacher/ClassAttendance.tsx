@@ -2,20 +2,20 @@
 // AttendAI — Class Attendance (Teacher)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '../../components/ui/Card';
 import Table from '../../components/ui/Table';
 import Badge from '../../components/ui/Badge';
-import { useAuthStore } from '../../store/authStore';
 import api from '../../api/client';
 import { FileBarChart, Filter, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { StudentAttendanceStat, Subject } from '../../types';
+import type { BadgeVariant } from '../../components/ui/Badge';
 
 export default function ClassAttendance() {
-  const { user } = useAuthStore();
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [stats, setStats] = useState<any[]>([]);
+  const [stats, setStats] = useState<StudentAttendanceStat[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function ClassAttendance() {
     {
       key: 'student',
       header: 'Student',
-      render: (s: any) => (
+      render: (s: StudentAttendanceStat) => (
         <div>
           <p className="font-medium text-[var(--text-primary)]">{s.displayName}</p>
           <p className="text-xs text-[var(--text-muted)] font-mono">{s.enrollmentId}</p>
@@ -88,14 +88,14 @@ export default function ClassAttendance() {
     {
       key: 'present',
       header: 'Classes Attended',
-      render: (s: any) => (
+      render: (s: StudentAttendanceStat) => (
         <span className="font-medium">{s.totalPresent} / {s.totalClasses}</span>
       )
     },
     {
       key: 'percentage',
       header: 'Percentage',
-      render: (s: any) => (
+      render: (s: StudentAttendanceStat) => (
         <span className={`font-bold font-mono ${
           s.percentage < 65 ? 'text-rose-400' : s.percentage < 75 ? 'text-amber-400' : 'text-emerald-400'
         }`}>
@@ -106,8 +106,8 @@ export default function ClassAttendance() {
     {
       key: 'status',
       header: 'Status',
-      render: (s: any) => {
-        let variant: any = 'present';
+      render: (s: StudentAttendanceStat) => {
+        let variant: BadgeVariant = 'present';
         let label = 'Good';
         if (s.percentage < 65) { variant = 'absent'; label = 'Critical'; }
         else if (s.percentage < 75) { variant = 'warning'; label = 'Warning'; }

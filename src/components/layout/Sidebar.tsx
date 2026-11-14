@@ -2,12 +2,11 @@
 // AttendAI — Sidebar Component
 // ═══════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
-  LayoutDashboard, ScanFace, ClipboardCheck, BookOpen,
-  Users, UserCog, FileBarChart, Settings, Bell,
+  LayoutDashboard, ScanFace, ClipboardCheck,
+  UserCog, FileBarChart, Settings, Bell,
   ChevronLeft, ChevronRight, GraduationCap, UserCircle,
   CalendarCheck, BookMarked, Shield
 } from 'lucide-react';
@@ -15,6 +14,10 @@ import {
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  /** Whether the off-canvas sidebar is open on small screens. */
+  mobileOpen?: boolean;
+  /** Called after a navigation link is clicked (closes the mobile drawer). */
+  onNavigate?: () => void;
 }
 
 const menuItems = {
@@ -44,9 +47,8 @@ const menuItems = {
   ],
 };
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onNavigate }: SidebarProps) {
   const { user } = useAuthStore();
-  const location = useLocation();
 
   if (!user) return null;
 
@@ -54,10 +56,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`sidebar fixed top-0 left-0 h-screen flex flex-col z-40 ${
-        collapsed ? 'w-16' : 'w-[260px]'
-      }`}
-      style={{ transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+      id="app-sidebar"
+      aria-label="Main navigation"
+      className={`sidebar fixed top-0 left-0 h-screen flex flex-col z-40 w-[260px] ${
+        collapsed ? 'lg:w-16' : 'lg:w-[260px]'
+      } ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
+      style={{ transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-[var(--border)]">
@@ -66,9 +70,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </div>
         {!collapsed && (
           <div className="animate-fade-in">
-            <h1 className="text-base font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <p className="text-base font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               AttendAI
-            </h1>
+            </p>
             <p className="text-[10px] text-[var(--text-muted)] -mt-0.5">BMSCE</p>
           </div>
         )}
@@ -83,6 +87,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             end={item.path === '/student' || item.path === '/teacher' || item.path === '/admin'}
             className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
             title={collapsed ? item.label : undefined}
+            aria-label={collapsed ? item.label : undefined}
+            onClick={onNavigate}
           >
             <item.icon size={20} className="flex-shrink-0" />
             {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
@@ -91,7 +97,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* Collapse Toggle */}
-      <div className="px-3 py-3 border-t border-[var(--border)]">
+      <div className="hidden lg:block px-3 py-3 border-t border-[var(--border)]">
         <button
           onClick={onToggle}
           className="sidebar-item w-full justify-center"

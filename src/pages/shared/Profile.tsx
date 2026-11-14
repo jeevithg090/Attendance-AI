@@ -7,9 +7,9 @@ import { useAuthStore } from '../../store/authStore';
 import { useFaceRecognition } from '../../hooks/useFaceRecognition';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import { User, Phone, Mail, Building, Hash, Camera, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Mail, Building, Hash, Camera, AlertCircle, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../../api/client';
+import api, { getErrorMessage } from '../../api/client';
 
 export default function Profile() {
   const { user, updateProfile } = useAuthStore();
@@ -41,8 +41,8 @@ export default function Profile() {
       await updateProfile(formData);
       setIsEditing(false);
       toast.success('Profile updated successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update profile');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to update profile'));
     } finally {
       setIsSaving(false);
     }
@@ -93,10 +93,10 @@ export default function Profile() {
       } else {
         throw new Error('Could not capture enough valid face samples');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Enrollment error:', error);
       setEnrollmentStatus('error');
-      toast.error(error.message || 'Face enrollment failed. Please try again.');
+      toast.error(getErrorMessage(error, 'Face enrollment failed. Please try again.'));
       setTimeout(() => {
         setEnrollmentStatus('idle');
         setEnrollmentProgress(0);

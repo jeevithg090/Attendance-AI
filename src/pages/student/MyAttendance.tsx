@@ -2,7 +2,7 @@
 // AttendAI — My Attendance (Student History)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendance } from '../../hooks/useAttendance';
 import Card from '../../components/ui/Card';
@@ -11,6 +11,7 @@ import Badge from '../../components/ui/Badge';
 import type { AttendanceRecord } from '../../types';
 import { format, parseISO } from 'date-fns';
 import { CalendarDays, Filter } from 'lucide-react';
+import type { BadgeVariant } from '../../components/ui/Badge';
 
 export default function MyAttendance() {
   const { user } = useAuthStore();
@@ -26,7 +27,7 @@ export default function MyAttendance() {
     const fetchSubjects = async () => {
       const stats = await getStudentStats();
       if (stats?.subjectAttendance) {
-        setSubjects(stats.subjectAttendance.map(s => ({
+        setSubjects(stats.subjectAttendance.map((s: { subjectId: string; subjectName: string }) => ({
           id: s.subjectId,
           name: s.subjectName
         })));
@@ -65,7 +66,7 @@ export default function MyAttendance() {
       key: 'status',
       header: 'Status',
       render: (record: AttendanceRecord) => {
-        let variant: 'present' | 'absent' | 'late' | 'proxy' = 'default' as any;
+        let variant: BadgeVariant = 'default';
         let label: string = record.status;
         
         if (record.status === 'present') variant = 'present';

@@ -2,10 +2,9 @@
 // AttendAI — Notifications Page (Shared)
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
 import { Bell, BellRing, AlertTriangle, Info, CheckCircle, Clock } from 'lucide-react';
 import api from '../../api/client';
 import { format, parseISO } from 'date-fns';
@@ -81,7 +80,7 @@ export default function Notifications() {
           <select 
             className="input w-auto text-sm"
             value={filter}
-            onChange={(e) => setFilter(e.target.value as any)}
+            onChange={(e) => setFilter(e.target.value as typeof filter)}
           >
             <option value="all">All Notifications</option>
             <option value="unread">Unread Only</option>

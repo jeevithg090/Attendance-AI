@@ -2,7 +2,6 @@
 // AttendAI — Loading Spinner Component
 // ═══════════════════════════════════════════════════════════
 
-import React from 'react';
 import { Loader2, ScanFace } from 'lucide-react';
 
 interface LoadingSpinnerProps {

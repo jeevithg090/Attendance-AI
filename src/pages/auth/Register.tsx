@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import api from '../../api/client';
+import api, { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { UserPlus, User } from 'lucide-react';
 
@@ -44,8 +44,8 @@ export default function Register() {
         employeeId: '',
         phone: '',
       });
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to register user');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to register user'));
     } finally {
       setIsLoading(false);
     }

@@ -4,8 +4,10 @@
 
 import React from 'react';
 
+export type BadgeVariant = 'present' | 'absent' | 'late' | 'proxy' | 'primary' | 'warning' | 'info' | 'default';
+
 interface BadgeProps {
-  variant?: 'present' | 'absent' | 'late' | 'proxy' | 'primary' | 'warning' | 'info' | 'default';
+  variant?: BadgeVariant;
   size?: 'sm' | 'md';
   children: React.ReactNode;
   className?: string;

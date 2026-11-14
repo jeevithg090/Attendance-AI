@@ -77,7 +77,7 @@ export function Table<T>({ columns, data, keyExtractor, rowClassName, emptyMessa
             <tr key={keyExtractor(item)} className={rowClassName?.(item) || ''}>
               {columns.map((col) => (
                 <td key={col.key}>
-                  {col.render ? col.render(item, index) : (item as any)[col.key]}
+                  {col.render ? col.render(item, index) : String((item as Record<string, unknown>)[col.key] ?? '')}
                 </td>
               ))}
             </tr>

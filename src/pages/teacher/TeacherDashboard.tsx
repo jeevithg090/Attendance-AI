@@ -2,7 +2,7 @@
 // AttendAI — Teacher Dashboard
 // ═══════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
@@ -10,15 +10,16 @@ import Card from '../../components/ui/Card';
 import StatCard from '../../components/ui/StatCard';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import { LayoutDashboard, Users, BookMarked, Play, Activity, Clock, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Users, BookMarked, Play, Activity, Clock } from 'lucide-react';
 import api from '../../api/client';
 import { format, parseISO } from 'date-fns';
+import type { Subject } from '../../types';
 
 export default function TeacherDashboard() {
   const { user } = useAuthStore();
   const { fetchTeacherSessions, activeSessions, isLoading } = useAttendanceStore();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<{ totalSubjects: number; totalStudents: number; subjects: Subject[] } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -28,10 +29,10 @@ export default function TeacherDashboard() {
       const fetchStats = async () => {
         try {
           const { data } = await api.get('/subjects/my-subjects');
-          const subjects = data.data;
+          const subjects: Subject[] = data.data;
           
           let totalStudents = 0;
-          subjects.forEach((s: any) => totalStudents += (s.enrolledCount || 0));
+          subjects.forEach((s) => totalStudents += (s.enrolledCount || 0));
           
           setStats({
             totalSubjects: subjects.length,
@@ -174,7 +175,7 @@ export default function TeacherDashboard() {
               <p className="text-sm text-[var(--text-muted)] text-center py-4">No subjects assigned yet.</p>
             ) : (
               <div className="space-y-4">
-                {stats.subjects.map((subject: any) => (
+                {stats.subjects.map((subject) => (
                   <div key={subject.id} className="p-3 rounded-lg border border-[var(--border-light)] hover:border-[var(--border)] transition-colors">
                     <h3 className="font-medium text-[var(--text-primary)]">{subject.name}</h3>
                     <div className="flex justify-between items-center mt-2">

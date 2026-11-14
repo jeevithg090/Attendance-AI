@@ -6,11 +6,12 @@ import React, { useEffect, useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Settings, Save, MapPin, Shield, Clock } from 'lucide-react';
-import api from '../../api/client';
+import api, { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
+import type { SystemSettings as SystemSettingsType } from '../../types';
 
 export default function SystemSettings() {
-  const [settings, setSettings] = useState<any>(null);
+  const [settings, setSettings] = useState<SystemSettingsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -34,8 +35,8 @@ export default function SystemSettings() {
     try {
       await api.put('/settings', settings);
       toast.success('Settings updated successfully');
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update settings');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to update settings'));
     } finally {
       setIsSaving(false);
     }
@@ -43,10 +44,11 @@ export default function SystemSettings() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setSettings({
-      ...settings,
-      [name]: type === 'checkbox' ? checked : type === 'number' ? parseFloat(value) : value,
-    });
+    setSettings((prev) =>
+      prev
+        ? { ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? parseFloat(value) : value }
+        : prev,
+    );
   };
 
   if (isLoading || !settings) {
