@@ -23,7 +23,9 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
       try {
         const { data } = await api.get('/notifications?unreadOnly=true');
         setUnreadCount(data.data.unreadCount || 0);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
@@ -104,7 +106,10 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
               <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
               <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--bg-surface)] border border-[var(--border-light)] rounded-[var(--radius-md)] shadow-[var(--shadow-lg)] z-50 animate-fade-in-down overflow-hidden">
                 <button
-                  onClick={() => { navigate('/profile'); setShowDropdown(false); }}
+                  onClick={() => {
+                    navigate('/profile');
+                    setShowDropdown(false);
+                  }}
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <User size={16} />

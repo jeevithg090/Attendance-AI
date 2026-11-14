@@ -50,21 +50,31 @@ export const subjects = pgTable('subjects', {
 });
 
 // ── Subject Enrollments (many-to-many) ────────────────────
-export const subjectEnrollments = pgTable('subject_enrollments', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  subjectId: uuid('subject_id').references(() => subjects.id, { onDelete: 'cascade' }).notNull(),
-  studentId: uuid('student_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-}, (table) => [
-  unique('subject_student_unique').on(table.subjectId, table.studentId),
-]);
+export const subjectEnrollments = pgTable(
+  'subject_enrollments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    subjectId: uuid('subject_id')
+      .references(() => subjects.id, { onDelete: 'cascade' })
+      .notNull(),
+    studentId: uuid('student_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+  },
+  (table) => [unique('subject_student_unique').on(table.subjectId, table.studentId)],
+);
 
 // ── Attendance Sessions ───────────────────────────────────
 export const attendanceSessions = pgTable('attendance_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
-  subjectId: uuid('subject_id').references(() => subjects.id).notNull(),
+  subjectId: uuid('subject_id')
+    .references(() => subjects.id)
+    .notNull(),
   subjectName: varchar('subject_name', { length: 255 }).notNull(),
   subjectCode: varchar('subject_code', { length: 50 }).notNull(),
-  teacherId: uuid('teacher_id').references(() => users.id).notNull(),
+  teacherId: uuid('teacher_id')
+    .references(() => users.id)
+    .notNull(),
   teacherName: varchar('teacher_name', { length: 255 }).notNull(),
   date: date('date').notNull(),
   startTime: timestamp('start_time', { withTimezone: true }).notNull(),
@@ -81,38 +91,53 @@ export const attendanceSessions = pgTable('attendance_sessions', {
 });
 
 // ── Attendance Records ────────────────────────────────────
-export const attendanceRecords = pgTable('attendance_records', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  sessionId: uuid('session_id').references(() => attendanceSessions.id).notNull(),
-  subjectId: uuid('subject_id').references(() => subjects.id).notNull(),
-  studentId: uuid('student_id').references(() => users.id).notNull(),
-  studentName: varchar('student_name', { length: 255 }).notNull(),
-  enrollmentId: varchar('enrollment_id', { length: 50 }).notNull(),
-  date: date('date').notNull(),
-  markedAt: timestamp('marked_at', { withTimezone: true }).defaultNow().notNull(),
-  status: varchar('status', { length: 20 }).default('absent').notNull()
-    .$type<'present' | 'absent' | 'proxy_detected' | 'late'>(),
-  verificationMethod: varchar('verification_method', { length: 30 }).default('face_recognition').notNull()
-    .$type<'face_recognition' | 'manual_override'>(),
-  faceMatchScore: real('face_match_score'),
-  faceMatchThreshold: real('face_match_threshold'),
-  ipAddress: varchar('ip_address', { length: 50 }),
-  deviceInfo: text('device_info'),
-  locationLat: doublePrecision('location_lat'),
-  locationLng: doublePrecision('location_lng'),
-  overrideBy: uuid('override_by').references(() => users.id),
-  overrideReason: text('override_reason'),
-  flagged: boolean('flagged').default(false).notNull(),
-  flagReason: text('flag_reason'),
-}, (table) => [
-  unique('session_student_unique').on(table.sessionId, table.studentId),
-]);
+export const attendanceRecords = pgTable(
+  'attendance_records',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sessionId: uuid('session_id')
+      .references(() => attendanceSessions.id)
+      .notNull(),
+    subjectId: uuid('subject_id')
+      .references(() => subjects.id)
+      .notNull(),
+    studentId: uuid('student_id')
+      .references(() => users.id)
+      .notNull(),
+    studentName: varchar('student_name', { length: 255 }).notNull(),
+    enrollmentId: varchar('enrollment_id', { length: 50 }).notNull(),
+    date: date('date').notNull(),
+    markedAt: timestamp('marked_at', { withTimezone: true }).defaultNow().notNull(),
+    status: varchar('status', { length: 20 })
+      .default('absent')
+      .notNull()
+      .$type<'present' | 'absent' | 'proxy_detected' | 'late'>(),
+    verificationMethod: varchar('verification_method', { length: 30 })
+      .default('face_recognition')
+      .notNull()
+      .$type<'face_recognition' | 'manual_override'>(),
+    faceMatchScore: real('face_match_score'),
+    faceMatchThreshold: real('face_match_threshold'),
+    ipAddress: varchar('ip_address', { length: 50 }),
+    deviceInfo: text('device_info'),
+    locationLat: doublePrecision('location_lat'),
+    locationLng: doublePrecision('location_lng'),
+    overrideBy: uuid('override_by').references(() => users.id),
+    overrideReason: text('override_reason'),
+    flagged: boolean('flagged').default(false).notNull(),
+    flagReason: text('flag_reason'),
+  },
+  (table) => [unique('session_student_unique').on(table.sessionId, table.studentId)],
+);
 
 // ── Notifications ─────────────────────────────────────────
 export const notifications = pgTable('notifications', {
   id: uuid('id').defaultRandom().primaryKey(),
-  recipientId: uuid('recipient_id').references(() => users.id).notNull(),
-  type: varchar('type', { length: 30 }).notNull()
+  recipientId: uuid('recipient_id')
+    .references(() => users.id)
+    .notNull(),
+  type: varchar('type', { length: 30 })
+    .notNull()
     .$type<'absent_alert' | 'low_attendance' | 'proxy_detected' | 'system'>(),
   title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),

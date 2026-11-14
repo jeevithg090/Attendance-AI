@@ -7,9 +7,7 @@ const { getErrorMessage } = await import('../../src/api/client');
 
 function axiosError(status?: number, data?: unknown) {
   const config = { headers: new AxiosHeaders() };
-  const response = status
-    ? { status, statusText: '', headers: {}, config, data }
-    : undefined;
+  const response = status ? { status, statusText: '', headers: {}, config, data } : undefined;
   return new AxiosError('Request failed', 'ERR', config, undefined, response);
 }
 

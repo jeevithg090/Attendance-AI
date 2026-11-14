@@ -26,7 +26,7 @@ export default function ManageTeachers() {
       const params = new URLSearchParams({ role: 'teacher' });
       if (search) params.append('search', search);
       if (deptFilter) params.append('department', deptFilter);
-      
+
       const { data } = await api.get(`/users?${params.toString()}`);
       setTeachers(data.data.items);
     } catch {
@@ -49,7 +49,7 @@ export default function ManageTeachers() {
           <p className="font-medium text-[var(--text-primary)]">{t.displayName}</p>
           <p className="text-xs text-[var(--text-muted)] font-mono">{t.employeeId}</p>
         </div>
-      )
+      ),
     },
     {
       key: 'contact',
@@ -59,22 +59,20 @@ export default function ManageTeachers() {
           <p className="text-sm">{t.email}</p>
           {t.phone && <p className="text-xs text-[var(--text-muted)]">{t.phone}</p>}
         </div>
-      )
+      ),
     },
     {
       key: 'department',
       header: 'Department',
-      render: (t: User) => <span className="text-sm">{t.department}</span>
+      render: (t: User) => <span className="text-sm">{t.department}</span>,
     },
     {
       key: 'status',
       header: 'Status',
       render: (t: User) => (
-        <Badge variant={t.isActive ? 'present' : 'absent'}>
-          {t.isActive ? 'Active' : 'Deactivated'}
-        </Badge>
-      )
-    }
+        <Badge variant={t.isActive ? 'present' : 'absent'}>{t.isActive ? 'Active' : 'Deactivated'}</Badge>
+      ),
+    },
   ];
 
   return (
@@ -89,7 +87,7 @@ export default function ManageTeachers() {
             <p className="text-[var(--text-muted)] text-sm mt-1">View and manage faculty accounts.</p>
           </div>
         </div>
-        
+
         <div className="flex gap-3">
           <Button variant="outline" icon={<Download size={16} />}>
             Export
@@ -102,24 +100,23 @@ export default function ManageTeachers() {
 
       <Card padding="none">
         <div className="p-4 border-b border-[var(--border)] bg-[var(--bg-elevated)] rounded-t-[var(--radius-xl)] flex flex-wrap gap-4 items-center justify-between">
-          
           <div className="flex items-center gap-2 relative max-w-sm w-full">
             <Search size={18} className="absolute left-3 text-[var(--text-muted)]" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input pl-10 w-full"
               placeholder="Search by name, Employee ID, email..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-[var(--text-muted)]" />
-            <select 
+            <select
               className="input w-auto"
               value={deptFilter}
-              onChange={e => setDeptFilter(e.target.value)}
+              onChange={(e) => setDeptFilter(e.target.value)}
             >
               <option value="">All Departments</option>
               <option value="Computer Science">Computer Science</option>
@@ -127,16 +124,15 @@ export default function ManageTeachers() {
               <option value="Mechanical Engineering">Mechanical Engineering</option>
             </select>
           </div>
-
         </div>
 
-        <Table 
+        <Table
           columns={columns}
           data={teachers}
-          keyExtractor={t => t.id}
+          keyExtractor={(t) => t.id}
           isLoading={isLoading}
           emptyMessage="No teachers found."
-          rowClassName={t => !t.isActive ? 'opacity-60' : ''}
+          rowClassName={(t) => (!t.isActive ? 'opacity-60' : '')}
         />
       </Card>
     </div>

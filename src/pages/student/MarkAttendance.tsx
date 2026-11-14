@@ -19,7 +19,7 @@ export default function MarkAttendance() {
   const { activeSessions, fetchActiveSessions, markAttendance } = useAttendanceStore();
   const navigate = useNavigate();
   const faceRec = useFaceRecognition();
-  
+
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function MarkAttendance() {
           console.error('Geolocation error:', err);
           setLocationError('Location access denied. This may flag your attendance.');
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     } else {
       setLocationError('Geolocation is not supported by your browser.');
@@ -66,7 +66,7 @@ export default function MarkAttendance() {
       toast.error('Please select a session first');
       return;
     }
-    
+
     if (!user?.faceEnrolled) {
       toast.error('Face data not enrolled. Please update your profile first.');
       navigate('/profile');
@@ -75,7 +75,7 @@ export default function MarkAttendance() {
 
     setIsScanning(true);
     setScanResult('pending');
-    
+
     setTimeout(async () => {
       const started = await faceRec.startWebcam(faceRec.videoRef.current!);
       if (!started) {
@@ -89,10 +89,10 @@ export default function MarkAttendance() {
 
     try {
       setSubmitting(true);
-      
+
       // Draw initial box
       await faceRec.drawDetection(faceRec.videoRef.current, faceRec.canvasRef.current);
-      
+
       // Capture a live descriptor; the server matches it against the enrolled face.
       const faceDescriptor = await faceRec.captureDescriptor(faceRec.videoRef.current);
       if (!faceDescriptor) {
@@ -110,7 +110,7 @@ export default function MarkAttendance() {
       const verified = result.status !== 'proxy_detected';
       await faceRec.drawDetection(faceRec.videoRef.current, faceRec.canvasRef.current, verified);
       setScanResult(verified ? 'success' : 'failed');
-      
+
       if (result.flagged) {
         toast.error(`Attendance flagged: ${result.flagReason}`, { duration: 6000 });
       } else {
@@ -123,7 +123,6 @@ export default function MarkAttendance() {
         setIsScanning(false);
         setSubmitting(false);
       }, 2000);
-
     } catch (error) {
       console.error('Scan error:', error);
       toast.error(getErrorMessage(error, 'Failed to process scan'));
@@ -150,24 +149,26 @@ export default function MarkAttendance() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      
       <div className="flex items-center gap-3">
         <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
           <ScanFace size={24} />
         </div>
         <div>
           <h1 className="text-2xl font-bold">Mark Attendance</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">Verify your identity using face recognition.</p>
+          <p className="text-[var(--text-muted)] text-sm mt-1">
+            Verify your identity using face recognition.
+          </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
         {/* Left Column - Setup */}
         <div className="space-y-6">
           <Card>
-            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">1. Select Class</h2>
-            
+            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">
+              1. Select Class
+            </h2>
+
             {activeSessions.length === 0 ? (
               <div className="p-4 rounded-lg bg-[var(--bg-elevated)] text-center text-[var(--text-muted)] text-sm">
                 No active sessions found for your enrolled subjects.
@@ -196,18 +197,23 @@ export default function MarkAttendance() {
           </Card>
 
           <Card>
-            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">2. Geolocation</h2>
-            
+            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">
+              2. Geolocation
+            </h2>
+
             <div className="flex items-start gap-3">
-              <div className={`mt-0.5 p-1.5 rounded-full ${location ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+              <div
+                className={`mt-0.5 p-1.5 rounded-full ${location ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}
+              >
                 {location ? <MapPin size={16} /> : <AlertTriangle size={16} />}
               </div>
               <div>
-                <p className="text-sm font-medium">
-                  {location ? 'Location acquired' : 'Location required'}
-                </p>
+                <p className="text-sm font-medium">{location ? 'Location acquired' : 'Location required'}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {locationError || (location ? `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}` : 'Requesting location access...')}
+                  {locationError ||
+                    (location
+                      ? `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`
+                      : 'Requesting location access...')}
                 </p>
                 {locationError && (
                   <p className="text-xs text-rose-400 mt-2 font-medium">
@@ -222,10 +228,11 @@ export default function MarkAttendance() {
         {/* Right Column - Scanner */}
         <div>
           <Card className="h-full flex flex-col">
-            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">3. Face Scan</h2>
-            
+            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">
+              3. Face Scan
+            </h2>
+
             <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
-              
               {!isScanning ? (
                 <div className="text-center">
                   <div className="w-20 h-20 mx-auto rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mb-4">
@@ -234,9 +241,9 @@ export default function MarkAttendance() {
                   <p className="text-sm text-[var(--text-muted)] mb-6 max-w-xs mx-auto">
                     Position your face clearly in the camera frame in a well-lit area.
                   </p>
-                  
-                  <Button 
-                    size="lg" 
+
+                  <Button
+                    size="lg"
                     onClick={handleStartScan}
                     disabled={!selectedSessionId || activeSessions.length === 0}
                     className="w-full"
@@ -246,11 +253,15 @@ export default function MarkAttendance() {
                 </div>
               ) : (
                 <div className="w-full relative">
-                  <div className={`relative rounded-xl overflow-hidden aspect-[4/3] bg-black ${
-                    scanResult === 'success' ? 'border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' :
-                    scanResult === 'failed' ? 'border-2 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)]' :
-                    'face-scan-ring'
-                  }`}>
+                  <div
+                    className={`relative rounded-xl overflow-hidden aspect-[4/3] bg-black ${
+                      scanResult === 'success'
+                        ? 'border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                        : scanResult === 'failed'
+                          ? 'border-2 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
+                          : 'face-scan-ring'
+                    }`}
+                  >
                     <video
                       ref={faceRec.videoRef}
                       onPlay={handleVideoPlay}
@@ -263,14 +274,14 @@ export default function MarkAttendance() {
                       ref={faceRec.canvasRef}
                       className="absolute inset-0 w-full h-full transform scale-x-[-1]"
                     />
-                    
+
                     {/* Scanning Animation Overlay */}
                     {scanResult === 'pending' && (
                       <div className="scan-overlay">
                         <div className="scan-line" />
                       </div>
                     )}
-                    
+
                     {/* Result Overlays */}
                     {scanResult === 'success' && (
                       <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center backdrop-blur-sm animate-fade-in">
@@ -279,7 +290,7 @@ export default function MarkAttendance() {
                         </div>
                       </div>
                     )}
-                    
+
                     {scanResult === 'failed' && (
                       <div className="absolute inset-0 bg-rose-500/20 flex items-center justify-center backdrop-blur-sm animate-fade-in">
                         <div className="bg-[var(--bg-surface)] rounded-full p-3 shadow-lg">
@@ -288,7 +299,7 @@ export default function MarkAttendance() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="mt-4 flex items-center justify-center gap-2">
                     {submitting && scanResult === 'pending' ? (
                       <>
@@ -296,7 +307,9 @@ export default function MarkAttendance() {
                         <span className="text-sm font-medium animate-pulse">Verifying identity...</span>
                       </>
                     ) : scanResult === 'success' ? (
-                      <span className="text-sm font-medium text-emerald-400">Identity verified successfully</span>
+                      <span className="text-sm font-medium text-emerald-400">
+                        Identity verified successfully
+                      </span>
                     ) : scanResult === 'failed' ? (
                       <span className="text-sm font-medium text-rose-400">Verification failed</span>
                     ) : (
@@ -308,7 +321,6 @@ export default function MarkAttendance() {
             </div>
           </Card>
         </div>
-        
       </div>
     </div>
   );

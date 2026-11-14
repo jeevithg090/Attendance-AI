@@ -26,7 +26,7 @@ export default function ManageStudents() {
       const params = new URLSearchParams({ role: 'student' });
       if (search) params.append('search', search);
       if (deptFilter) params.append('department', deptFilter);
-      
+
       const { data } = await api.get(`/users?${params.toString()}`);
       setStudents(data.data.items);
     } catch {
@@ -49,7 +49,7 @@ export default function ManageStudents() {
           <p className="font-medium text-[var(--text-primary)]">{s.displayName}</p>
           <p className="text-xs text-[var(--text-muted)] font-mono">{s.enrollmentId}</p>
         </div>
-      )
+      ),
     },
     {
       key: 'contact',
@@ -59,21 +59,19 @@ export default function ManageStudents() {
           <p className="text-sm">{s.email}</p>
           {s.phone && <p className="text-xs text-[var(--text-muted)]">{s.phone}</p>}
         </div>
-      )
+      ),
     },
     {
       key: 'department',
       header: 'Department',
-      render: (s: User) => <span className="text-sm">{s.department}</span>
+      render: (s: User) => <span className="text-sm">{s.department}</span>,
     },
     {
       key: 'status',
       header: 'Status',
       render: (s: User) => (
-        <Badge variant={s.isActive ? 'present' : 'absent'}>
-          {s.isActive ? 'Active' : 'Deactivated'}
-        </Badge>
-      )
+        <Badge variant={s.isActive ? 'present' : 'absent'}>{s.isActive ? 'Active' : 'Deactivated'}</Badge>
+      ),
     },
     {
       key: 'faceEnrolled',
@@ -82,8 +80,8 @@ export default function ManageStudents() {
         <Badge variant={s.faceEnrolled ? 'present' : 'warning'}>
           {s.faceEnrolled ? 'Enrolled' : 'Pending'}
         </Badge>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -98,7 +96,7 @@ export default function ManageStudents() {
             <p className="text-[var(--text-muted)] text-sm mt-1">View and manage student accounts.</p>
           </div>
         </div>
-        
+
         <div className="flex gap-3">
           <Button variant="outline" icon={<Download size={16} />}>
             Export
@@ -111,24 +109,23 @@ export default function ManageStudents() {
 
       <Card padding="none">
         <div className="p-4 border-b border-[var(--border)] bg-[var(--bg-elevated)] rounded-t-[var(--radius-xl)] flex flex-wrap gap-4 items-center justify-between">
-          
           <div className="flex items-center gap-2 relative max-w-sm w-full">
             <Search size={18} className="absolute left-3 text-[var(--text-muted)]" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input pl-10 w-full"
               placeholder="Search by name, USN, email..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-[var(--text-muted)]" />
-            <select 
+            <select
               className="input w-auto"
               value={deptFilter}
-              onChange={e => setDeptFilter(e.target.value)}
+              onChange={(e) => setDeptFilter(e.target.value)}
             >
               <option value="">All Departments</option>
               <option value="Computer Science">Computer Science</option>
@@ -136,16 +133,15 @@ export default function ManageStudents() {
               <option value="Mechanical Engineering">Mechanical Engineering</option>
             </select>
           </div>
-
         </div>
 
-        <Table 
+        <Table
           columns={columns}
           data={students}
-          keyExtractor={s => s.id}
+          keyExtractor={(s) => s.id}
           isLoading={isLoading}
           emptyMessage="No students found."
-          rowClassName={s => !s.isActive ? 'opacity-60' : ''}
+          rowClassName={(s) => (!s.isActive ? 'opacity-60' : '')}
         />
       </Card>
     </div>

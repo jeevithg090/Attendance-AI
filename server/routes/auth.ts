@@ -76,7 +76,11 @@ router.get(
   '/me',
   authenticate,
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
-    const [user] = await db.select().from(users).where(eq(users.id, currentUser(req).id)).limit(1);
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, currentUser(req).id))
+      .limit(1);
     if (!user) throw notFound('User not found');
     res.json({ success: true, data: toPublicUser(user) });
   }),

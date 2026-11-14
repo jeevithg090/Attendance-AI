@@ -14,17 +14,19 @@ import api, { getErrorMessage } from '../../api/client';
 export default function Profile() {
   const { user, updateProfile } = useAuthStore();
   const faceRec = useFaceRecognition();
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     displayName: user?.displayName || '',
     phone: user?.phone || '',
   });
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [isEnrollingFace, setIsEnrollingFace] = useState(false);
   const [enrollmentProgress, setEnrollmentProgress] = useState(0);
-  const [enrollmentStatus, setEnrollmentStatus] = useState<'idle' | 'capturing' | 'processing' | 'success' | 'error'>('idle');
+  const [enrollmentStatus, setEnrollmentStatus] = useState<
+    'idle' | 'capturing' | 'processing' | 'success' | 'error'
+  >('idle');
 
   useEffect(() => {
     return () => {
@@ -53,7 +55,7 @@ export default function Profile() {
     setEnrollmentStatus('idle');
     setEnrollmentProgress(0);
     await faceRec.loadModels();
-    
+
     setTimeout(async () => {
       const started = await faceRec.startWebcam(faceRec.videoRef.current!);
       if (!started) {
@@ -65,27 +67,25 @@ export default function Profile() {
 
   const handleCaptureFaces = async () => {
     if (!faceRec.videoRef.current) return;
-    
+
     setEnrollmentStatus('capturing');
     try {
-      const descriptors = await faceRec.captureEnrollmentDescriptors(
-        faceRec.videoRef.current,
-        5,
-        (count) => setEnrollmentProgress(count)
+      const descriptors = await faceRec.captureEnrollmentDescriptors(faceRec.videoRef.current, 5, (count) =>
+        setEnrollmentProgress(count),
       );
 
       if (descriptors.length === 5) {
         setEnrollmentStatus('processing');
-        
+
         // Save to backend
         await api.post(`/users/${user.id}/face-descriptors`, { descriptors });
-        
+
         // Update local user state
         await useAuthStore.getState().loadUser();
-        
+
         setEnrollmentStatus('success');
         toast.success('Face data enrolled successfully!');
-        
+
         setTimeout(() => {
           setIsEnrollingFace(false);
           faceRec.stopWebcam();
@@ -135,8 +135,12 @@ export default function Profile() {
                 </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={handleSaveProfile} isLoading={isSaving}>Save</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={handleSaveProfile} isLoading={isSaving}>
+                    Save
+                  </Button>
                 </div>
               )}
             </div>
@@ -144,13 +148,15 @@ export default function Profile() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">Full Name</label>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                    Full Name
+                  </label>
                   {isEditing ? (
-                    <input 
-                      type="text" 
-                      className="input" 
+                    <input
+                      type="text"
+                      className="input"
                       value={formData.displayName}
-                      onChange={e => setFormData({...formData, displayName: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                     />
                   ) : (
                     <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)]">
@@ -159,9 +165,11 @@ export default function Profile() {
                     </div>
                   )}
                 </div>
-                
+
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">Email Address</label>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                    Email Address
+                  </label>
                   <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)] opacity-70 cursor-not-allowed">
                     <Mail size={16} className="text-[var(--text-muted)]" />
                     {user.email}
@@ -170,7 +178,11 @@ export default function Profile() {
 
                 <div>
                   <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
-                    {user.role === 'student' ? 'Enrollment ID' : user.role === 'teacher' ? 'Employee ID' : 'Admin ID'}
+                    {user.role === 'student'
+                      ? 'Enrollment ID'
+                      : user.role === 'teacher'
+                        ? 'Employee ID'
+                        : 'Admin ID'}
                   </label>
                   <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)] opacity-70 cursor-not-allowed">
                     <Hash size={16} className="text-[var(--text-muted)]" />
@@ -179,13 +191,15 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">Phone Number</label>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                    Phone Number
+                  </label>
                   {isEditing ? (
-                    <input 
-                      type="tel" 
-                      className="input" 
+                    <input
+                      type="tel"
+                      className="input"
                       value={formData.phone}
-                      onChange={e => setFormData({...formData, phone: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="+91..."
                     />
                   ) : (
@@ -197,7 +211,9 @@ export default function Profile() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">Department</label>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                    Department
+                  </label>
                   <div className="flex items-center gap-2 text-[var(--text-primary)] bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-light)] opacity-70 cursor-not-allowed">
                     <Building size={16} className="text-[var(--text-muted)]" />
                     {user.department || 'N/A'}
@@ -222,8 +238,10 @@ export default function Profile() {
           </Card>
 
           <Card>
-            <h2 className="text-lg font-semibold mb-4 border-b border-[var(--border)] pb-2">Biometric Data</h2>
-            
+            <h2 className="text-lg font-semibold mb-4 border-b border-[var(--border)] pb-2">
+              Biometric Data
+            </h2>
+
             {!isEnrollingFace ? (
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
@@ -233,14 +251,14 @@ export default function Profile() {
                   <div>
                     <h4 className="font-medium">Face Recognition</h4>
                     <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
-                      {user.faceEnrolled 
-                        ? 'Your face data is registered and active for attendance verification.' 
+                      {user.faceEnrolled
+                        ? 'Your face data is registered and active for attendance verification.'
                         : 'Face data not enrolled. Required for marking attendance.'}
                     </p>
-                    
-                    <Button 
-                      variant={user.faceEnrolled ? 'outline' : 'primary'} 
-                      size="sm" 
+
+                    <Button
+                      variant={user.faceEnrolled ? 'outline' : 'primary'}
+                      size="sm"
                       icon={<Camera size={16} />}
                       onClick={handleStartEnrollment}
                     >
@@ -265,20 +283,20 @@ export default function Profile() {
                         playsInline
                         className="w-full h-full object-cover transform scale-x-[-1]"
                       />
-                      
+
                       {enrollmentStatus === 'capturing' && (
                         <div className="absolute inset-0 border-4 border-indigo-500/50 flex flex-col items-center justify-end p-4 bg-gradient-to-t from-black/80 to-transparent">
                           <p className="text-white font-medium mb-2">Look straight at the camera</p>
                           <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-indigo-500 transition-all duration-300" 
+                            <div
+                              className="h-full bg-indigo-500 transition-all duration-300"
                               style={{ width: `${(enrollmentProgress / 5) * 100}%` }}
                             />
                           </div>
                           <p className="text-xs text-indigo-300 mt-2">{enrollmentProgress} of 5 captures</p>
                         </div>
                       )}
-                      
+
                       {enrollmentStatus === 'processing' && (
                         <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
                           <div className="text-center">
@@ -287,7 +305,7 @@ export default function Profile() {
                           </div>
                         </div>
                       )}
-                      
+
                       {enrollmentStatus === 'success' && (
                         <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center backdrop-blur-sm">
                           <CheckCircle2 className="text-emerald-500" size={48} />
@@ -296,7 +314,7 @@ export default function Profile() {
                     </>
                   )}
                 </div>
-                
+
                 {enrollmentStatus === 'idle' && !faceRec.isLoading && (
                   <div className="flex gap-2">
                     <Button variant="ghost" className="flex-1" onClick={handleCancelEnrollment}>
@@ -307,9 +325,13 @@ export default function Profile() {
                     </Button>
                   </div>
                 )}
-                
+
                 {enrollmentStatus === 'error' && (
-                  <Button variant="outline" className="w-full border-rose-500/50 text-rose-400 hover:bg-rose-500/10" onClick={handleCancelEnrollment}>
+                  <Button
+                    variant="outline"
+                    className="w-full border-rose-500/50 text-rose-400 hover:bg-rose-500/10"
+                    onClick={handleCancelEnrollment}
+                  >
                     Try Again
                   </Button>
                 )}

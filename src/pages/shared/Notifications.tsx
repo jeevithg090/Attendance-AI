@@ -42,24 +42,33 @@ export default function Notifications() {
   const markAsRead = async (id: string) => {
     try {
       await api.put(`/notifications/${id}/read`);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
-    } catch { /* ignore */ }
+      setNotifications(notifications.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    } catch {
+      /* ignore */
+    }
   };
 
   const markAllAsRead = async () => {
     try {
       await api.put('/notifications/read-all');
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
-    } catch { /* ignore */ }
+      setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    } catch {
+      /* ignore */
+    }
   };
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'absent_alert': return <AlertTriangle className="text-amber-500" />;
-      case 'proxy_detected': return <AlertTriangle className="text-rose-500" />;
-      case 'low_attendance': return <Clock className="text-rose-400" />;
-      case 'system': return <Info className="text-indigo-400" />;
-      default: return <BellRing className="text-[var(--text-muted)]" />;
+      case 'absent_alert':
+        return <AlertTriangle className="text-amber-500" />;
+      case 'proxy_detected':
+        return <AlertTriangle className="text-rose-500" />;
+      case 'low_attendance':
+        return <Clock className="text-rose-400" />;
+      case 'system':
+        return <Info className="text-indigo-400" />;
+      default:
+        return <BellRing className="text-[var(--text-muted)]" />;
     }
   };
 
@@ -75,9 +84,9 @@ export default function Notifications() {
             <p className="text-[var(--text-muted)] text-sm mt-1">Alerts, updates, and system messages.</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <select 
+          <select
             className="input w-auto text-sm"
             value={filter}
             onChange={(e) => setFilter(e.target.value as typeof filter)}
@@ -105,31 +114,31 @@ export default function Notifications() {
         ) : (
           <div className="divide-y divide-[var(--border)]">
             {notifications.map((notif) => (
-              <div 
-                key={notif.id} 
+              <div
+                key={notif.id}
                 className={`p-4 md:p-5 flex gap-4 transition-colors ${
-                  notif.read ? 'bg-[var(--bg-surface)] opacity-70' : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated-2)]'
+                  notif.read
+                    ? 'bg-[var(--bg-surface)] opacity-70'
+                    : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated-2)]'
                 }`}
               >
-                <div className="mt-1 flex-shrink-0">
-                  {getIcon(notif.type)}
-                </div>
-                
+                <div className="mt-1 flex-shrink-0">{getIcon(notif.type)}</div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h4 className={`font-medium text-sm md:text-base ${notif.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>
+                    <h4
+                      className={`font-medium text-sm md:text-base ${notif.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}
+                    >
                       {notif.title}
                     </h4>
                     <span className="text-xs text-[var(--text-muted)] whitespace-nowrap flex-shrink-0">
                       {format(parseISO(notif.createdAt), 'MMM d, h:mm a')}
                     </span>
                   </div>
-                  <p className="text-sm text-[var(--text-secondary)] mb-2">
-                    {notif.message}
-                  </p>
-                  
+                  <p className="text-sm text-[var(--text-secondary)] mb-2">{notif.message}</p>
+
                   {!notif.read && (
-                    <button 
+                    <button
                       onClick={() => markAsRead(notif.id)}
                       className="text-xs font-medium text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] transition-colors"
                     >
@@ -137,7 +146,7 @@ export default function Notifications() {
                     </button>
                   )}
                 </div>
-                
+
                 {!notif.read && (
                   <div className="flex-shrink-0 flex items-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] animate-pulse-dot" />

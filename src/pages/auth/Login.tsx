@@ -22,7 +22,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<'student' | 'teacher' | 'admin'>('student');
-  
+
   const { login, isLoading } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -47,13 +47,15 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex bg-[var(--bg-primary)]">
-      
       {/* Left side — Animated Illustration (Hidden on mobile) */}
       <div className="hidden lg:flex flex-1 flex-col justify-center items-center relative overflow-hidden bg-gradient-to-br from-[#0A0F1E] to-[#111827] border-r border-[var(--border)]">
         {/* Animated background elements */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--accent-primary)] rounded-full mix-blend-screen filter blur-[128px] opacity-20 animate-pulse-glow" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--accent-info)] rounded-full mix-blend-screen filter blur-[128px] opacity-20 animate-pulse-glow" style={{ animationDelay: '1s' }} />
-        
+        <div
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--accent-info)] rounded-full mix-blend-screen filter blur-[128px] opacity-20 animate-pulse-glow"
+          style={{ animationDelay: '1s' }}
+        />
+
         <div className="z-10 text-center max-w-lg px-8 animate-fade-in-up">
           <div className="w-24 h-24 mx-auto mb-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[var(--shadow-glow-primary)]">
             <ScanFace size={48} className="text-white" />
@@ -65,9 +67,10 @@ export default function Login() {
             Anti-Proxy Attendance System
           </h2>
           <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
-            Secure, fast, and frictionless classroom attendance powered by face recognition technology and geospatial validation.
+            Secure, fast, and frictionless classroom attendance powered by face recognition technology and
+            geospatial validation.
           </p>
-          
+
           <div className="mt-12 flex justify-center gap-4">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-light)] text-sm font-medium text-[var(--text-secondary)]">
               <Shield size={16} className="text-emerald-400" /> Secure
@@ -82,7 +85,6 @@ export default function Login() {
       {/* Right side — Login Form */}
       <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12">
         <div className="w-full max-w-[440px] animate-fade-in">
-          
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
@@ -96,7 +98,7 @@ export default function Login() {
           <Card glass padding="lg" className="w-full relative overflow-hidden">
             {/* Top decorative gradient line */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-            
+
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h2>
               <p className="text-[var(--text-muted)]">Sign in to your BMSCE account</p>
@@ -111,8 +113,8 @@ export default function Login() {
                   onClick={() => handleRoleSelect(role)}
                   aria-pressed={activeTab === role}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 capitalize ${
-                    activeTab === role 
-                      ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm border border-[var(--border-light)]' 
+                    activeTab === role
+                      ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm border border-[var(--border-light)]'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                   }`}
                 >
@@ -123,7 +125,10 @@ export default function Login() {
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
-                <label htmlFor="login-email" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                <label
+                  htmlFor="login-email"
+                  className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+                >
                   Email Address
                 </label>
                 <div className="relative">
@@ -145,7 +150,10 @@ export default function Login() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="login-password" className="block text-sm font-medium text-[var(--text-secondary)]">
+                  <label
+                    htmlFor="login-password"
+                    className="block text-sm font-medium text-[var(--text-secondary)]"
+                  >
                     Password
                   </label>
                   <span className="text-xs text-[var(--text-muted)]">Forgot it? Ask your administrator.</span>
@@ -175,13 +183,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                variant="primary"
-                className="w-full mt-2"
-                size="lg"
-                isLoading={isLoading}
-              >
+              <Button type="submit" variant="primary" className="w-full mt-2" size="lg" isLoading={isLoading}>
                 Sign In
               </Button>
             </form>
@@ -189,12 +191,15 @@ export default function Login() {
             <div className="mt-8 pt-6 border-t border-[var(--border)] text-center">
               <p className="text-sm text-[var(--text-muted)]">
                 Don't have an account?{' '}
-                <a href="#" className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors">
+                <a
+                  href="#"
+                  className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors"
+                >
                   Contact your department admin
                 </a>
               </p>
             </div>
-            
+
             {SHOW_DEMO_LOGINS && (
               <div className="mt-6 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 text-center">
                 <strong>Demo mode:</strong> click a role tab above to fill in the seeded demo account.

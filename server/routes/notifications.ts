@@ -37,7 +37,10 @@ router.get(
 router.put(
   '/read-all',
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
-    await db.update(notifications).set({ read: true }).where(eq(notifications.recipientId, currentUser(req).id));
+    await db
+      .update(notifications)
+      .set({ read: true })
+      .where(eq(notifications.recipientId, currentUser(req).id));
     res.json({ success: true });
   }),
 );
@@ -49,7 +52,12 @@ router.put(
     await db
       .update(notifications)
       .set({ read: true })
-      .where(and(eq(notifications.id, uuidParam(req.params.id)), eq(notifications.recipientId, currentUser(req).id)));
+      .where(
+        and(
+          eq(notifications.id, uuidParam(req.params.id)),
+          eq(notifications.recipientId, currentUser(req).id),
+        ),
+      );
     res.json({ success: true });
   }),
 );

@@ -22,11 +22,13 @@ export default function AdminDashboard() {
       try {
         const { data } = await api.get('/attendance/dashboard/stats');
         setStats(data.data);
-      } catch { /* ignore */ } finally {
+      } catch {
+        /* ignore */
+      } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchStats();
   }, []);
 
@@ -73,39 +75,43 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="flex flex-col items-center justify-center py-12 text-center">
-           <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center mb-4">
-              <Users size={32} />
-           </div>
-           <h3 className="text-lg font-bold mb-2">User Management</h3>
-           <p className="text-sm text-[var(--text-muted)] mb-6 max-w-sm">
-             Add new students and teachers, reset passwords, and manage enrollments.
-           </p>
-           <div className="flex gap-4 w-full px-8">
-             <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/manage-students')}>
-               Manage Students
-             </Button>
-             <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/manage-teachers')}>
-               Manage Teachers
-             </Button>
-           </div>
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center mb-4">
+            <Users size={32} />
+          </div>
+          <h3 className="text-lg font-bold mb-2">User Management</h3>
+          <p className="text-sm text-[var(--text-muted)] mb-6 max-w-sm">
+            Add new students and teachers, reset passwords, and manage enrollments.
+          </p>
+          <div className="flex gap-4 w-full px-8">
+            <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/manage-students')}>
+              Manage Students
+            </Button>
+            <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/manage-teachers')}>
+              Manage Teachers
+            </Button>
+          </div>
         </Card>
-        
+
         <Card className="flex flex-col items-center justify-center py-12 text-center">
-           <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-4">
-              <BookMarked size={32} />
-           </div>
-           <h3 className="text-lg font-bold mb-2">System Operations</h3>
-           <p className="text-sm text-[var(--text-muted)] mb-6 max-w-sm">
-             Configure geofencing, update face match thresholds, and view campus-wide reports.
-           </p>
-           <div className="flex gap-4 w-full px-8">
-             <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/system-settings')}>
-               System Settings
-             </Button>
-             <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/attendance-reports')}>
-               View Reports
-             </Button>
-           </div>
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-4">
+            <BookMarked size={32} />
+          </div>
+          <h3 className="text-lg font-bold mb-2">System Operations</h3>
+          <p className="text-sm text-[var(--text-muted)] mb-6 max-w-sm">
+            Configure geofencing, update face match thresholds, and view campus-wide reports.
+          </p>
+          <div className="flex gap-4 w-full px-8">
+            <Button variant="secondary" className="flex-1" onClick={() => navigate('/admin/system-settings')}>
+              System Settings
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => navigate('/admin/attendance-reports')}
+            >
+              View Reports
+            </Button>
+          </div>
         </Card>
       </div>
     </div>

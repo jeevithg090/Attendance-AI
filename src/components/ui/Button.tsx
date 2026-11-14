@@ -13,12 +13,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<string, string> = {
-  primary: 'bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white shadow-[var(--shadow-glow-primary)]',
-  secondary: 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated-2)] text-[var(--text-primary)] border border-[var(--border-light)]',
+  primary:
+    'bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white shadow-[var(--shadow-glow-primary)]',
+  secondary:
+    'bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated-2)] text-[var(--text-primary)] border border-[var(--border-light)]',
   danger: 'bg-[var(--accent-danger)] hover:opacity-90 text-white shadow-[var(--shadow-glow-danger)]',
   success: 'bg-[var(--accent-success)] hover:opacity-90 text-white shadow-[var(--shadow-glow-success)]',
-  ghost: 'bg-transparent hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-  outline: 'bg-transparent border border-[var(--border-light)] hover:border-[var(--accent-primary)] text-[var(--text-primary)]',
+  ghost:
+    'bg-transparent hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+  outline:
+    'bg-transparent border border-[var(--border-light)] hover:border-[var(--accent-primary)] text-[var(--text-primary)]',
 };
 
 const sizeStyles: Record<string, string> = {

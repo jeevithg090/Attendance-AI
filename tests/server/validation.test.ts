@@ -12,7 +12,12 @@ const descriptor = Array.from({ length: 128 }, () => 0.1);
 
 describe('markAttendanceSchema', () => {
   it('accepts a valid payload', () => {
-    const parsed = markAttendanceSchema.parse({ sessionId: uuid, faceDescriptor: descriptor, latitude: 12.9, longitude: 77.5 });
+    const parsed = markAttendanceSchema.parse({
+      sessionId: uuid,
+      faceDescriptor: descriptor,
+      latitude: 12.9,
+      longitude: 77.5,
+    });
     expect(parsed.sessionId).toBe(uuid);
   });
 
@@ -21,11 +26,17 @@ describe('markAttendanceSchema', () => {
   });
 
   it('rejects descriptors of the wrong length', () => {
-    expect(markAttendanceSchema.safeParse({ sessionId: uuid, faceDescriptor: [0.1, 0.2] }).success).toBe(false);
+    expect(markAttendanceSchema.safeParse({ sessionId: uuid, faceDescriptor: [0.1, 0.2] }).success).toBe(
+      false,
+    );
   });
 
   it('rejects out-of-range coordinates', () => {
-    const result = markAttendanceSchema.safeParse({ sessionId: uuid, faceDescriptor: descriptor, latitude: 200 });
+    const result = markAttendanceSchema.safeParse({
+      sessionId: uuid,
+      faceDescriptor: descriptor,
+      latitude: 200,
+    });
     expect(result.success).toBe(false);
   });
 });

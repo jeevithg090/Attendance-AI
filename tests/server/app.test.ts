@@ -61,7 +61,9 @@ describe('POST /api/auth/login', () => {
 
   it('rejects unknown users with a generic message and no internals', async () => {
     queueResult([]); // no user found
-    const res = await request(app).post('/api/auth/login').send({ email: 'x@example.com', password: 'whatever' });
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'x@example.com', password: 'whatever' });
     expect(res.status).toBe(401);
     expect(res.body).toEqual({ success: false, error: 'Invalid credentials' });
   });
@@ -112,7 +114,9 @@ describe('authentication middleware', () => {
 
   it('rejects deactivated users', async () => {
     queueAuthUser('student', false);
-    const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${tokenFor('student')}`);
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${tokenFor('student')}`);
     expect(res.status).toBe(401);
   });
 });
@@ -120,7 +124,9 @@ describe('authentication middleware', () => {
 describe('authorization', () => {
   it('forbids students from listing users', async () => {
     queueAuthUser('student');
-    const res = await request(app).get('/api/users').set('Authorization', `Bearer ${tokenFor('student')}`);
+    const res = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${tokenFor('student')}`);
     expect(res.status).toBe(403);
   });
 
@@ -134,7 +140,9 @@ describe('authorization', () => {
 
   it("forbids students from reading another user's profile", async () => {
     queueAuthUser('student');
-    const res = await request(app).get(`/api/users/${ids.admin}`).set('Authorization', `Bearer ${tokenFor('student')}`);
+    const res = await request(app)
+      .get(`/api/users/${ids.admin}`)
+      .set('Authorization', `Bearer ${tokenFor('student')}`);
     expect(res.status).toBe(403);
   });
 
@@ -160,7 +168,9 @@ describe('authorization', () => {
 describe('input validation', () => {
   it('rejects non-uuid ids with 400', async () => {
     queueAuthUser('admin');
-    const res = await request(app).get('/api/users/not-a-uuid').set('Authorization', `Bearer ${tokenFor('admin')}`);
+    const res = await request(app)
+      .get('/api/users/not-a-uuid')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
     expect(res.status).toBe(400);
   });
 

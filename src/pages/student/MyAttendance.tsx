@@ -17,20 +17,22 @@ export default function MyAttendance() {
   const { user } = useAuthStore();
   const { getStudentRecords, getStudentStats, isLoading } = useAttendance();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [subjects, setSubjects] = useState<{id: string, name: string}[]>([]);
+  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [filterSubject, setFilterSubject] = useState<string>('');
 
   useEffect(() => {
     if (!user) return;
-    
+
     // Fetch stats to get subjects list
     const fetchSubjects = async () => {
       const stats = await getStudentStats();
       if (stats?.subjectAttendance) {
-        setSubjects(stats.subjectAttendance.map((s: { subjectId: string; subjectName: string }) => ({
-          id: s.subjectId,
-          name: s.subjectName
-        })));
+        setSubjects(
+          stats.subjectAttendance.map((s: { subjectId: string; subjectName: string }) => ({
+            id: s.subjectId,
+            name: s.subjectName,
+          })),
+        );
       }
     };
     fetchSubjects();
@@ -38,7 +40,7 @@ export default function MyAttendance() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     const fetchRecords = async () => {
       const data = await getStudentRecords(user.id, filterSubject || undefined);
       setRecords(data);
@@ -52,15 +54,15 @@ export default function MyAttendance() {
       header: 'Date',
       render: (record: AttendanceRecord) => (
         <span className="font-medium">{format(parseISO(record.date), 'MMM d, yyyy')}</span>
-      )
+      ),
     },
     {
       key: 'subject',
       header: 'Subject',
       render: (record: AttendanceRecord) => {
-        const subject = subjects.find(s => s.id === record.subjectId);
+        const subject = subjects.find((s) => s.id === record.subjectId);
         return subject ? subject.name : 'Unknown';
-      }
+      },
     },
     {
       key: 'status',
@@ -68,7 +70,7 @@ export default function MyAttendance() {
       render: (record: AttendanceRecord) => {
         let variant: BadgeVariant = 'default';
         let label: string = record.status;
-        
+
         if (record.status === 'present') variant = 'present';
         else if (record.status === 'absent') variant = 'absent';
         else if (record.status === 'late') variant = 'late';
@@ -77,8 +79,12 @@ export default function MyAttendance() {
           label = 'Proxy Detected';
         }
 
-        return <Badge variant={variant} className="uppercase tracking-wider">{label}</Badge>;
-      }
+        return (
+          <Badge variant={variant} className="uppercase tracking-wider">
+            {label}
+          </Badge>
+        );
+      },
     },
     {
       key: 'method',
@@ -87,25 +93,22 @@ export default function MyAttendance() {
         <span className="text-xs text-[var(--text-muted)] capitalize">
           {record.verificationMethod.replace('_', ' ')}
         </span>
-      )
+      ),
     },
     {
       key: 'details',
       header: 'Details',
-      render: (record: AttendanceRecord) => (
+      render: (record: AttendanceRecord) =>
         record.flagged ? (
           <span className="text-xs text-rose-400" title={record.flagReason || ''}>
             Flagged Issue
           </span>
         ) : record.faceMatchScore ? (
-          <span className="text-xs text-emerald-400">
-            Match: {(record.faceMatchScore * 100).toFixed(1)}%
-          </span>
+          <span className="text-xs text-emerald-400">Match: {(record.faceMatchScore * 100).toFixed(1)}%</span>
         ) : (
           <span className="text-xs text-[var(--text-muted)]">-</span>
-        )
-      )
-    }
+        ),
+    },
   ];
 
   return (
@@ -129,27 +132,29 @@ export default function MyAttendance() {
             <Filter size={16} />
             <span className="text-sm font-medium">Filter by Subject:</span>
           </div>
-          
-          <select 
+
+          <select
             className="input w-auto min-w-[200px]"
             value={filterSubject}
             onChange={(e) => setFilterSubject(e.target.value)}
           >
             <option value="">All Subjects</option>
-            {subjects.map(sub => (
-              <option key={sub.id} value={sub.id}>{sub.name}</option>
+            {subjects.map((sub) => (
+              <option key={sub.id} value={sub.id}>
+                {sub.name}
+              </option>
             ))}
           </select>
         </div>
 
         {/* Table */}
-        <Table 
-          columns={columns} 
-          data={records} 
+        <Table
+          columns={columns}
+          data={records}
           keyExtractor={(r) => r.id}
           isLoading={isLoading}
           emptyMessage="No attendance records found."
-          rowClassName={(r) => r.status === 'absent' ? 'row-absent' : ''}
+          rowClassName={(r) => (r.status === 'absent' ? 'row-absent' : '')}
         />
       </Card>
     </div>
