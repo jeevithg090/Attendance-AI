@@ -1,344 +1,340 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Attendance Routes (Mark & Query)
-// ═══════════════════════════════════════════════════════════
-
+// Attendance marking, overrides and reporting.
 import { Router } from 'express';
+import { and, count, desc, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/connection';
-import { attendanceRecords, attendanceSessions, systemSettings, users, subjects, subjectEnrollments, notifications } from '../db/schema';
-import { eq, and, desc, between, count, sql } from 'drizzle-orm';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
-import { verifyGeofence, checkDuplicate, isStudentEnrolled, getAttendancePercentage } from '../services/attendanceService';
+import {
+  attendanceRecords,
+  attendanceSessions,
+  notifications,
+  subjectEnrollments,
+  subjects,
+  users,
+} from '../db/schema';
+import { ATTENDED_STATUSES, attendancePercentage, countsAsAttended, evaluateAttendance } from '../lib/attendance';
+import { bestFaceMatch } from '../lib/face';
+import { asyncHandler, badRequest, conflict, forbidden, isUniqueViolation, notFound } from '../http/errors';
+import { markAttendanceSchema, overrideSchema, queryString, uuidParam } from '../http/validation';
+import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { currentUser, requireRole } from '../middleware/rbac';
+import {
+  assertOwnsResource,
+  getSessionOrThrow,
+  getSubjectOrThrow,
+  hasMarkedAttendance,
+  isStudentEnrolled,
+} from '../services/attendanceService';
+import { getSettings } from '../services/settingsService';
+import { broadcastToSession } from './sse';
 
 const router = Router();
 router.use(authenticate);
 
-// ── POST /api/attendance/mark ────────────────────────────
-router.post('/mark', requireRole('student'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const { sessionId, faceMatchScore, latitude, longitude, deviceInfo } = req.body;
+const attendedStatuses = [...ATTENDED_STATUSES] as ('present' | 'late')[];
+const isoDate = (value: unknown) => {
+  const s = queryString(value);
+  return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined;
+};
 
-    // Get session
-    const [session] = await db.select()
-      .from(attendanceSessions)
-      .where(eq(attendanceSessions.id, sessionId))
+/** Present+late counts per student for a subject, in one grouped query. */
+async function attendedCountsBySubject(subjectId: string) {
+  const rows = await db
+    .select({ studentId: attendanceRecords.studentId, count: count() })
+    .from(attendanceRecords)
+    .where(and(eq(attendanceRecords.subjectId, subjectId), inArray(attendanceRecords.status, attendedStatuses)))
+    .groupBy(attendanceRecords.studentId);
+  return new Map(rows.map((r) => [r.studentId, r.count]));
+}
+
+// POST /api/attendance/mark — student checks in with a live face descriptor
+router.post(
+  '/mark',
+  requireRole('student'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const me = currentUser(req);
+    const input = markAttendanceSchema.parse(req.body);
+
+    const session = await getSessionOrThrow(input.sessionId);
+    if (session.status !== 'active') throw badRequest('Session has ended');
+
+    const settings = await getSettings();
+    const now = new Date();
+    const windowEnds = new Date(session.startTime).getTime() + settings.attendanceWindowMinutes * 60_000;
+    if (now.getTime() > windowEnds) throw badRequest('The attendance window for this session has closed');
+
+    if (!(await isStudentEnrolled(session.subjectId, me.id))) {
+      throw forbidden('You are not enrolled in this subject');
+    }
+    if (await hasMarkedAttendance(session.id, me.id)) {
+      throw conflict('Attendance already marked for this session');
+    }
+
+    const [student] = await db
+      .select({
+        displayName: users.displayName,
+        enrollmentId: users.enrollmentId,
+        faceDescriptors: users.faceDescriptors,
+      })
+      .from(users)
+      .where(eq(users.id, me.id))
       .limit(1);
 
-    if (!session) {
-      res.status(404).json({ success: false, error: 'Session not found' });
-      return;
+    // Face matching happens on the server so clients cannot submit their own score.
+    const match = bestFaceMatch(input.faceDescriptor, student?.faceDescriptors);
+    if (!match) throw badRequest('Face data not enrolled. Please enrol your face from your profile first.');
+
+    const hasLocation = typeof input.latitude === 'number' && typeof input.longitude === 'number';
+    const evaluation = evaluateAttendance({
+      faceScore: match.score,
+      faceThreshold: settings.faceMatchThreshold,
+      sessionStart: new Date(session.startTime),
+      now,
+      lateThresholdMinutes: settings.lateThresholdMinutes,
+      location: hasLocation ? { lat: input.latitude as number, lng: input.longitude as number } : null,
+      geofence: {
+        enabled: settings.geofencingEnabled,
+        lat: settings.campusLat,
+        lng: settings.campusLng,
+        radius: settings.campusRadius,
+      },
+    });
+
+    let record;
+    try {
+      [record] = await db
+        .insert(attendanceRecords)
+        .values({
+          sessionId: session.id,
+          subjectId: session.subjectId,
+          studentId: me.id,
+          studentName: student?.displayName ?? me.displayName,
+          enrollmentId: student?.enrollmentId ?? '',
+          date: session.date,
+          status: evaluation.status,
+          verificationMethod: 'face_recognition',
+          faceMatchScore: match.score,
+          faceMatchThreshold: settings.faceMatchThreshold,
+          ipAddress: req.ip,
+          deviceInfo: input.deviceInfo,
+          locationLat: hasLocation ? input.latitude : null,
+          locationLng: hasLocation ? input.longitude : null,
+          flagged: evaluation.flagged,
+          flagReason: evaluation.flagReasons.join('; ') || null,
+        })
+        .returning();
+    } catch (error) {
+      if (isUniqueViolation(error)) throw conflict('Attendance already marked for this session');
+      throw error;
     }
 
-    if (session.status !== 'active') {
-      res.status(400).json({ success: false, error: 'Session has ended' });
-      return;
-    }
-
-    // Check if student is enrolled
-    const enrolled = await isStudentEnrolled(session.subjectId, req.user!.id);
-    if (!enrolled) {
-      res.status(403).json({ success: false, error: 'You are not enrolled in this subject' });
-      return;
-    }
-
-    // Check duplicate
-    const duplicate = await checkDuplicate(sessionId, req.user!.id);
-    if (duplicate) {
-      res.status(409).json({ success: false, error: 'Attendance already marked for this session' });
-      return;
-    }
-
-    // Get settings
-    const [settings] = await db.select().from(systemSettings)
-      .where(eq(systemSettings.id, 'global')).limit(1);
-
-    const threshold = settings?.faceMatchThreshold || 0.5;
-
-    // Geofence check
-    let geofenceOk = true;
-    let flagged = false;
-    let flagReason = '';
-
-    if (settings?.geofencingEnabled && latitude && longitude) {
-      const geoResult = await verifyGeofence(latitude, longitude);
-      if (!geoResult.withinBounds) {
-        geofenceOk = false;
-        flagged = true;
-        flagReason = `Outside campus geofence. Distance: ${geoResult.distance}m (max: ${geoResult.radius}m)`;
-      }
-    } else if (settings?.geofencingEnabled && (!latitude || !longitude)) {
-      flagged = true;
-      flagReason = 'GPS location not provided';
-    }
-
-    // Determine status
-    let status: 'present' | 'late' | 'proxy_detected' = 'present';
-
-    // Check if face match score is below threshold
-    if (faceMatchScore < threshold) {
-      status = 'proxy_detected';
-      flagged = true;
-      flagReason = `Face match score ${faceMatchScore} below threshold ${threshold}`;
-
-      // Send proxy notification
+    if (evaluation.status === 'proxy_detected') {
       await db.insert(notifications).values({
         recipientId: session.teacherId,
         type: 'proxy_detected',
         title: 'Proxy Attempt Detected',
-        message: `Possible proxy attempt by student in ${session.subjectName}. Face match: ${(faceMatchScore * 100).toFixed(1)}%`,
-        metadata: { sessionId, studentId: req.user!.id },
+        message: `Possible proxy attempt by ${record.studentName} in ${session.subjectName}. Face match: ${(match.score * 100).toFixed(1)}%`,
+        metadata: { sessionId: session.id, studentId: me.id },
       });
     }
 
-    // Check if late
-    if (status === 'present' && settings?.lateThresholdMinutes) {
-      const sessionStart = new Date(session.startTime).getTime();
-      const now = Date.now();
-      const minutesPassed = (now - sessionStart) / (1000 * 60);
-      if (minutesPassed > settings.lateThresholdMinutes) {
-        status = 'late';
-      }
-    }
-
-    // If geofence failed, flag as proxy
-    if (!geofenceOk) {
-      status = 'proxy_detected';
-    }
-
-    // Get student details
-    const [student] = await db.select({
-      displayName: users.displayName,
-      enrollmentId: users.enrollmentId,
-    }).from(users).where(eq(users.id, req.user!.id)).limit(1);
-
-    // Create attendance record
-    const [record] = await db.insert(attendanceRecords).values({
-      sessionId,
-      subjectId: session.subjectId,
-      studentId: req.user!.id,
-      studentName: student?.displayName || req.user!.displayName,
-      enrollmentId: student?.enrollmentId || '',
-      date: session.date,
-      status,
-      verificationMethod: 'face_recognition',
-      faceMatchScore,
-      faceMatchThreshold: threshold,
-      ipAddress: (req.ip || req.headers['x-forwarded-for'] as string) || undefined,
-      deviceInfo,
-      locationLat: latitude,
-      locationLng: longitude,
-      flagged,
-      flagReason: flagReason || undefined,
-    }).returning();
-
-    // Update session present count
-    if (status === 'present' || status === 'late') {
-      await db.update(attendanceSessions)
+    if (countsAsAttended(evaluation.status)) {
+      await db
+        .update(attendanceSessions)
         .set({ totalPresent: sql`${attendanceSessions.totalPresent} + 1` })
-        .where(eq(attendanceSessions.id, sessionId));
+        .where(eq(attendanceSessions.id, session.id));
     }
 
+    broadcastToSession(session.id, { type: 'new_record', data: record });
     res.status(201).json({ success: true, data: record });
-  } catch (error) {
-    console.error('Mark attendance error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── POST /api/attendance/override ────────────────────────
-router.post('/override', requireRole('teacher', 'admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const { recordId, status, reason } = req.body;
+// POST /api/attendance/override — teacher/admin corrects a record
+router.post(
+  '/override',
+  requireRole('teacher', 'admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const me = currentUser(req);
+    const { recordId, status, reason } = overrideSchema.parse(req.body);
 
-    const [updated] = await db.update(attendanceRecords)
+    const [existing] = await db.select().from(attendanceRecords).where(eq(attendanceRecords.id, recordId)).limit(1);
+    if (!existing) throw notFound('Attendance record not found');
+    const session = await getSessionOrThrow(existing.sessionId);
+    assertOwnsResource(me, session.teacherId);
+
+    const [updated] = await db
+      .update(attendanceRecords)
       .set({
         status,
         verificationMethod: 'manual_override',
-        overrideBy: req.user!.id,
+        overrideBy: me.id,
         overrideReason: reason,
         flagged: false,
       })
       .where(eq(attendanceRecords.id, recordId))
       .returning();
 
+    const delta = Number(countsAsAttended(status)) - Number(countsAsAttended(existing.status));
+    if (delta !== 0) {
+      await db
+        .update(attendanceSessions)
+        .set({ totalPresent: sql`greatest(${attendanceSessions.totalPresent} + ${delta}, 0)` })
+        .where(eq(attendanceSessions.id, session.id));
+    }
+
+    broadcastToSession(session.id, { type: 'record_updated', data: updated });
     res.json({ success: true, data: updated });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/attendance/session/:sessionId ────────────────
-router.get('/session/:sessionId', async (req: AuthenticatedRequest, res) => {
-  try {
-    const records = await db.select()
+// GET /api/attendance/session/:sessionId
+router.get(
+  '/session/:sessionId',
+  requireRole('teacher', 'admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const session = await getSessionOrThrow(uuidParam(req.params.sessionId));
+    assertOwnsResource(currentUser(req), session.teacherId);
+
+    const records = await db
+      .select()
       .from(attendanceRecords)
-      .where(eq(attendanceRecords.sessionId, req.params.sessionId))
+      .where(eq(attendanceRecords.sessionId, session.id))
       .orderBy(desc(attendanceRecords.markedAt));
-
     res.json({ success: true, data: records });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/attendance/student/:studentId ────────────────
-router.get('/student/:studentId', async (req: AuthenticatedRequest, res) => {
-  try {
-    const { subjectId, startDate, endDate } = req.query;
-    const conditions = [eq(attendanceRecords.studentId, req.params.studentId)];
+// GET /api/attendance/student/:studentId — students may only read their own history
+router.get(
+  '/student/:studentId',
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const me = currentUser(req);
+    const studentId = uuidParam(req.params.studentId);
+    if (me.role === 'student' && me.id !== studentId) throw forbidden();
 
-    if (subjectId) conditions.push(eq(attendanceRecords.subjectId, subjectId as string));
+    const conditions: SQL[] = [eq(attendanceRecords.studentId, studentId)];
+    const subjectId = queryString(req.query.subjectId);
+    const startDate = isoDate(req.query.startDate);
+    const endDate = isoDate(req.query.endDate);
+    if (subjectId) conditions.push(eq(attendanceRecords.subjectId, uuidParam(subjectId)));
+    if (startDate) conditions.push(gte(attendanceRecords.date, startDate));
+    if (endDate) conditions.push(lte(attendanceRecords.date, endDate));
 
-    const records = await db.select()
+    const records = await db
+      .select()
       .from(attendanceRecords)
       .where(and(...conditions))
-      .orderBy(desc(attendanceRecords.date));
-
+      .orderBy(desc(attendanceRecords.date), desc(attendanceRecords.markedAt));
     res.json({ success: true, data: records });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/attendance/subject/:subjectId/stats ─────────
-router.get('/subject/:subjectId/stats', async (req: AuthenticatedRequest, res) => {
-  try {
-    const subjectId = req.params.subjectId;
+// GET /api/attendance/subject/:subjectId/stats
+router.get(
+  '/subject/:subjectId/stats',
+  requireRole('teacher', 'admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const subject = await getSubjectOrThrow(uuidParam(req.params.subjectId));
+    assertOwnsResource(currentUser(req), subject.teacherId);
 
-    // Get enrolled students with their attendance
-    const enrolledStudents = await db.select({
-      studentId: users.id,
-      displayName: users.displayName,
-      enrollmentId: users.enrollmentId,
-    })
+    const enrolledStudents = await db
+      .select({ studentId: users.id, displayName: users.displayName, enrollmentId: users.enrollmentId })
       .from(subjectEnrollments)
       .innerJoin(users, eq(users.id, subjectEnrollments.studentId))
-      .where(eq(subjectEnrollments.subjectId, subjectId));
+      .where(eq(subjectEnrollments.subjectId, subject.id));
 
-    const [subject] = await db.select({ totalClasses: subjects.totalClasses })
-      .from(subjects).where(eq(subjects.id, subjectId)).limit(1);
-
-    const stats = await Promise.all(enrolledStudents.map(async (student) => {
-      const [presentResult] = await db.select({ count: count() })
-        .from(attendanceRecords)
-        .where(and(
-          eq(attendanceRecords.subjectId, subjectId),
-          eq(attendanceRecords.studentId, student.studentId),
-          eq(attendanceRecords.status, 'present')
-        ));
-
-      const totalPresent = presentResult?.count || 0;
-      const totalClasses = subject?.totalClasses || 0;
-      const percentage = totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 100;
-
+    const attended = await attendedCountsBySubject(subject.id);
+    const stats = enrolledStudents.map((s) => {
+      const totalPresent = attended.get(s.studentId) ?? 0;
       return {
-        studentId: student.studentId,
-        displayName: student.displayName,
-        enrollmentId: student.enrollmentId,
+        ...s,
         totalPresent,
-        totalClasses,
-        percentage,
+        totalClasses: subject.totalClasses,
+        percentage: attendancePercentage(totalPresent, subject.totalClasses),
       };
-    }));
-
+    });
     res.json({ success: true, data: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/attendance/dashboard/stats ───────────────────
-router.get('/dashboard/stats', requireRole('admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
+// GET /api/attendance/dashboard/stats (admin)
+router.get(
+  '/dashboard/stats',
+  requireRole('admin'),
+  asyncHandler(async (_req, res) => {
+    const today = new Date().toISOString().slice(0, 10);
 
-    // Total counts
-    const [studentCount] = await db.select({ count: count() }).from(users).where(eq(users.role, 'student'));
-    const [teacherCount] = await db.select({ count: count() }).from(users).where(eq(users.role, 'teacher'));
-    const [subjectCount] = await db.select({ count: count() }).from(subjects);
-    const [activeSessionCount] = await db.select({ count: count() })
-      .from(attendanceSessions).where(eq(attendanceSessions.status, 'active'));
-
-    // Today's attendance
-    const [todayPresent] = await db.select({ count: count() })
-      .from(attendanceRecords)
-      .where(and(eq(attendanceRecords.date, today), eq(attendanceRecords.status, 'present')));
-
-    const [todayTotal] = await db.select({ count: count() })
-      .from(attendanceRecords)
-      .where(eq(attendanceRecords.date, today));
-
-    const todayPercent = (todayTotal?.count || 0) > 0
-      ? Math.round(((todayPresent?.count || 0) / (todayTotal?.count || 0)) * 100)
-      : 0;
-
-    // Proxy attempts today
-    const [proxyCount] = await db.select({ count: count() })
-      .from(attendanceRecords)
-      .where(and(eq(attendanceRecords.date, today), eq(attendanceRecords.flagged, true)));
+    const [[students], [teachers], [subjectTotal], [activeSessions], [todayRow]] = await Promise.all([
+      db.select({ n: count() }).from(users).where(eq(users.role, 'student')),
+      db.select({ n: count() }).from(users).where(eq(users.role, 'teacher')),
+      db.select({ n: count() }).from(subjects),
+      db.select({ n: count() }).from(attendanceSessions).where(eq(attendanceSessions.status, 'active')),
+      db
+        .select({
+          total: count(),
+          attended: sql<number>`count(*) filter (where ${inArray(attendanceRecords.status, attendedStatuses)})`.mapWith(Number),
+          flagged: sql<number>`count(*) filter (where ${attendanceRecords.flagged})`.mapWith(Number),
+        })
+        .from(attendanceRecords)
+        .where(eq(attendanceRecords.date, today)),
+    ]);
 
     res.json({
       success: true,
       data: {
-        totalStudents: studentCount?.count || 0,
-        totalTeachers: teacherCount?.count || 0,
-        totalSubjects: subjectCount?.count || 0,
-        activeSessions: activeSessionCount?.count || 0,
-        todayAttendancePercent: todayPercent,
-        proxyAttemptsToday: proxyCount?.count || 0,
+        totalStudents: students?.n ?? 0,
+        totalTeachers: teachers?.n ?? 0,
+        totalSubjects: subjectTotal?.n ?? 0,
+        activeSessions: activeSessions?.n ?? 0,
+        todayAttendancePercent:
+          todayRow && todayRow.total > 0 ? Math.round((todayRow.attended / todayRow.total) * 100) : 0,
+        proxyAttemptsToday: todayRow?.flagged ?? 0,
         departmentWise: [],
         attendanceTrend: [],
       },
     });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/attendance/my-stats (student) ────────────────
-router.get('/my-stats', requireRole('student'), async (req: AuthenticatedRequest, res) => {
-  try {
-    // Get enrolled subjects
-    const enrollments = await db.select({ subject: subjects })
+// GET /api/attendance/my-stats (student)
+router.get(
+  '/my-stats',
+  requireRole('student'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const me = currentUser(req);
+    const enrollments = await db
+      .select({ subject: subjects })
       .from(subjectEnrollments)
       .innerJoin(subjects, eq(subjects.id, subjectEnrollments.subjectId))
-      .where(eq(subjectEnrollments.studentId, req.user!.id));
+      .where(eq(subjectEnrollments.studentId, me.id));
 
-    const subjectAttendance = await Promise.all(enrollments.map(async (e) => {
-      const percentage = await getAttendancePercentage(e.subject.id, req.user!.id);
-
-      const [presentCount] = await db.select({ count: count() })
-        .from(attendanceRecords)
-        .where(and(
-          eq(attendanceRecords.subjectId, e.subject.id),
-          eq(attendanceRecords.studentId, req.user!.id),
-          eq(attendanceRecords.status, 'present')
-        ));
-
-      return {
-        subjectId: e.subject.id,
-        subjectName: e.subject.name,
-        subjectCode: e.subject.code,
-        totalClasses: e.subject.totalClasses,
-        attended: presentCount?.count || 0,
-        percentage,
-      };
-    }));
-
-    // Recent activity
-    const recentActivity = await db.select()
+    const attendedRows = await db
+      .select({ subjectId: attendanceRecords.subjectId, count: count() })
       .from(attendanceRecords)
-      .where(eq(attendanceRecords.studentId, req.user!.id))
+      .where(and(eq(attendanceRecords.studentId, me.id), inArray(attendanceRecords.status, attendedStatuses)))
+      .groupBy(attendanceRecords.subjectId);
+    const attended = new Map(attendedRows.map((r) => [r.subjectId, r.count]));
+
+    const subjectAttendance = enrollments.map(({ subject }) => {
+      const count = attended.get(subject.id) ?? 0;
+      return {
+        subjectId: subject.id,
+        subjectName: subject.name,
+        subjectCode: subject.code,
+        totalClasses: subject.totalClasses,
+        attended: count,
+        percentage: attendancePercentage(count, subject.totalClasses),
+      };
+    });
+
+    const recentActivity = await db
+      .select()
+      .from(attendanceRecords)
+      .where(eq(attendanceRecords.studentId, me.id))
       .orderBy(desc(attendanceRecords.markedAt))
       .limit(10);
 
-    res.json({
-      success: true,
-      data: { subjectAttendance, recentActivity },
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+    res.json({ success: true, data: { subjectAttendance, recentActivity } });
+  }),
+);
 
 export default router;

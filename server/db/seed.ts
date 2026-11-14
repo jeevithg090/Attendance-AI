@@ -1,78 +1,87 @@
-import { db } from './connection';
-import { users, subjects, systemSettings } from './schema';
+// Seeds global settings and a demo admin/teacher/student/subject.
+// Idempotent: safe to run multiple times.
 import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
+import { env } from '../config/env';
+import { db } from './connection';
+import { subjectEnrollments, subjects, systemSettings, users } from './schema';
 
-async function seed() {
-  console.log('🌱 Seeding database with demo data...');
+const DEMO_DEFAULTS = {
+  SEED_ADMIN_PASSWORD: 'Admin@123',
+  SEED_TEACHER_PASSWORD: 'Teacher@123',
+  SEED_STUDENT_PASSWORD: 'Student@123',
+} as const;
 
-  try {
-    // 1. Set up global settings (BMSCE Coordinates)
-    console.log('Adding global settings...');
-    await db.insert(systemSettings).values({
-      id: 'global',
-      geofencingEnabled: true,
-      campusLat: 12.9416151,
-      campusLng: 77.5668099,
-      campusRadius: 200,
-      faceMatchThreshold: 0.5,
-      attendanceWindowMinutes: 30,
-      lateThresholdMinutes: 10,
-    }).onConflictDoNothing();
-
-    // 2. Create Admin
-    console.log('Creating Admin...');
-    const adminPass = await bcrypt.hash('Admin@123', 10);
-    await db.insert(users).values({
-      email: 'admin@bmsce.ac.in',
-      passwordHash: adminPass,
-      displayName: 'System Administrator',
-      role: 'admin',
-      department: 'Admin',
-    }).onConflictDoNothing();
-
-    // 3. Create Teacher
-    console.log('Creating Teacher...');
-    const teacherPass = await bcrypt.hash('Teacher@123', 10);
-    const [teacher] = await db.insert(users).values({
-      email: 'teacher1@bmsce.ac.in',
-      passwordHash: teacherPass,
-      displayName: 'Dr. Jane Smith',
-      role: 'teacher',
-      department: 'Computer Science',
-      employeeId: 'EMP001',
-    }).onConflictDoNothing().returning();
-
-    // 4. Create Student
-    console.log('Creating Student...');
-    const studentPass = await bcrypt.hash('Student@123', 10);
-    await db.insert(users).values({
-      email: 'student1@bmsce.ac.in',
-      passwordHash: studentPass,
-      displayName: 'John Doe',
-      role: 'student',
-      department: 'Computer Science',
-      enrollmentId: '1BM25CS001',
-    }).onConflictDoNothing();
-
-    // 5. Create a Subject
-    if (teacher) {
-      console.log('Creating Demo Subject...');
-      await db.insert(subjects).values({
-        name: 'Innovation & Design Thinking',
-        code: '25ME2AEIDT',
-        department: 'Computer Science',
-        semester: 2,
-        teacherId: teacher.id,
-        teacherName: teacher.displayName,
-      }).onConflictDoNothing();
-    }
-
-    console.log('✅ Seeding complete!');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Seeding failed:', error);
-    process.exit(1);
+function seedPassword(name: keyof typeof DEMO_DEFAULTS): string {
+  const value = process.env[name];
+  if (value) return value;
+  if (env.NODE_ENV === 'production') {
+    throw new Error(`${name} must be set when seeding a production database`);
   }
+  return DEMO_DEFAULTS[name];
 }
 
-seed();
+async function upsertUser(values: typeof users.$inferInsert) {
+  await db.insert(users).values(values).onConflictDoNothing();
+  const [user] = await db.select().from(users).where(eq(users.email, values.email)).limit(1);
+  return user;
+}
+
+async function seed() {
+  console.log('Seeding database...');
+
+  await db.insert(systemSettings).values({ id: 'global' }).onConflictDoNothing();
+
+  await upsertUser({
+    email: 'admin@bmsce.ac.in',
+    passwordHash: await bcrypt.hash(seedPassword('SEED_ADMIN_PASSWORD'), 12),
+    displayName: 'System Administrator',
+    role: 'admin',
+    department: 'Admin',
+  });
+
+  const teacher = await upsertUser({
+    email: 'teacher1@bmsce.ac.in',
+    passwordHash: await bcrypt.hash(seedPassword('SEED_TEACHER_PASSWORD'), 12),
+    displayName: 'Dr. Jane Smith',
+    role: 'teacher',
+    department: 'Computer Science',
+    employeeId: 'EMP001',
+  });
+
+  const student = await upsertUser({
+    email: 'student1@bmsce.ac.in',
+    passwordHash: await bcrypt.hash(seedPassword('SEED_STUDENT_PASSWORD'), 12),
+    displayName: 'John Doe',
+    role: 'student',
+    department: 'Computer Science',
+    enrollmentId: '1BM25CS001',
+  });
+
+  await db
+    .insert(subjects)
+    .values({
+      name: 'Innovation & Design Thinking',
+      code: '25ME2AEIDT',
+      department: 'Computer Science',
+      semester: 2,
+      teacherId: teacher.id,
+      teacherName: teacher.displayName,
+    })
+    .onConflictDoNothing();
+  const [subject] = await db.select().from(subjects).where(eq(subjects.code, '25ME2AEIDT')).limit(1);
+
+  await db
+    .insert(subjectEnrollments)
+    .values({ subjectId: subject.id, studentId: student.id })
+    .onConflictDoNothing();
+
+  console.log('Seeding complete.');
+}
+
+seed()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error('Seeding failed:', error);
+    process.exit(1);
+  });

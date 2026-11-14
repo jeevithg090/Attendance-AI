@@ -1,6 +1,4 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Drizzle ORM Schema (Neon PostgreSQL)
-// ═══════════════════════════════════════════════════════════
+// Drizzle ORM schema for the Neon PostgreSQL database.
 
 import {
   pgTable,

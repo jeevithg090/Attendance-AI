@@ -1,68 +1,63 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Server-Sent Events (SSE) for Real-time Updates
-// ═══════════════════════════════════════════════════════════
-
-import { Router } from 'express';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
+// Server-Sent Events: live attendance updates for a session's teacher.
+import { Router, type Response } from 'express';
+import { asyncHandler } from '../http/errors';
+import { uuidParam } from '../http/validation';
+import { authenticateSse, type AuthenticatedRequest } from '../middleware/auth';
+import { currentUser, requireRole } from '../middleware/rbac';
+import { assertOwnsResource, getSessionOrThrow } from '../services/attendanceService';
 
 const router = Router();
 
-// Store active SSE connections per session
-const sessionClients = new Map<string, Set<{
-  id: string;
-  res: any;
-}>>();
+const KEEP_ALIVE_MS = 30_000;
+const sessionClients = new Map<string, Set<Response>>();
 
-// ── GET /api/sse/session/:sessionId ──────────────────────
-router.get('/session/:sessionId', authenticate, (req: AuthenticatedRequest, res) => {
-  const sessionId = req.params.sessionId;
+// GET /api/sse/session/:sessionId
+router.get(
+  '/session/:sessionId',
+  authenticateSse,
+  requireRole('teacher', 'admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const session = await getSessionOrThrow(uuidParam(req.params.sessionId));
+    assertOwnsResource(currentUser(req), session.teacherId);
 
-  // Set SSE headers
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  });
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`data: ${JSON.stringify({ type: 'connected', sessionId: session.id })}\n\n`);
 
-  // Send initial connection event
-  res.write(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`);
-
-  // Add to clients
-  const client = { id: req.user!.id, res };
-  if (!sessionClients.has(sessionId)) {
-    sessionClients.set(sessionId, new Set());
-  }
-  sessionClients.get(sessionId)!.add(client);
-
-  // Keep-alive ping every 30 seconds
-  const keepAlive = setInterval(() => {
-    res.write(':ping\n\n');
-  }, 30000);
-
-  // Cleanup on disconnect
-  req.on('close', () => {
-    clearInterval(keepAlive);
-    sessionClients.get(sessionId)?.delete(client);
-    if (sessionClients.get(sessionId)?.size === 0) {
-      sessionClients.delete(sessionId);
+    let clients = sessionClients.get(session.id);
+    if (!clients) {
+      clients = new Set();
+      sessionClients.set(session.id, clients);
     }
-  });
-});
+    clients.add(res);
 
-// ── Broadcast to session clients ─────────────────────────
+    const keepAlive = setInterval(() => res.write(':ping\n\n'), KEEP_ALIVE_MS);
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+      const set = sessionClients.get(session.id);
+      set?.delete(res);
+      if (set?.size === 0) sessionClients.delete(session.id);
+    });
+  }),
+);
+
+/** Push an event to every client listening on a session. */
 export function broadcastToSession(sessionId: string, data: Record<string, unknown>) {
   const clients = sessionClients.get(sessionId);
   if (!clients) return;
-
   const message = `data: ${JSON.stringify(data)}\n\n`;
-  clients.forEach((client) => {
+  for (const client of clients) {
     try {
-      client.res.write(message);
+      client.write(message);
     } catch {
       clients.delete(client);
     }
-  });
+  }
 }
 
 export default router;

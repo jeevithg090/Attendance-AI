@@ -1,70 +1,61 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — System Settings Routes
-// ═══════════════════════════════════════════════════════════
-
+// System settings & audit log routes.
 import { Router } from 'express';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '../db/connection';
-import { systemSettings, auditLogs } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { auditLogs, systemSettings } from '../db/schema';
+import { asyncHandler, badRequest } from '../http/errors';
+import { settingsUpdateSchema } from '../http/validation';
+import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { currentUser, requireRole } from '../middleware/rbac';
+import { GLOBAL_SETTINGS_ID, getSettings } from '../services/settingsService';
 
 const router = Router();
 router.use(authenticate);
 
-// ── GET /api/settings ────────────────────────────────────
-router.get('/', async (_req, res) => {
-  try {
-    let [settings] = await db.select().from(systemSettings)
-      .where(eq(systemSettings.id, 'global')).limit(1);
+// GET /api/settings
+router.get(
+  '/',
+  asyncHandler(async (_req, res) => {
+    res.json({ success: true, data: await getSettings() });
+  }),
+);
 
-    // Create default if not exists
-    if (!settings) {
-      [settings] = await db.insert(systemSettings).values({ id: 'global' }).returning();
-    }
+// PUT /api/settings (admin)
+router.put(
+  '/',
+  requireRole('admin'),
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    // The UI posts the whole settings object; drop the read-only id before validating.
+    const { id: _id, ...body } = (req.body ?? {}) as Record<string, unknown>;
+    const updates = settingsUpdateSchema.parse(body);
+    if (Object.keys(updates).length === 0) throw badRequest('No settings provided');
 
-    res.json({ success: true, data: settings });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── PUT /api/settings ────────────────────────────────────
-router.put('/', requireRole('admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const updates = req.body;
-
-    const [updated] = await db.update(systemSettings)
+    await getSettings(); // ensure the row exists
+    const [updated] = await db
+      .update(systemSettings)
       .set(updates)
-      .where(eq(systemSettings.id, 'global'))
+      .where(eq(systemSettings.id, GLOBAL_SETTINGS_ID))
       .returning();
 
-    // Audit log
     await db.insert(auditLogs).values({
-      userId: req.user!.id,
+      userId: currentUser(req).id,
       action: 'UPDATE_SETTINGS',
       details: updates,
-      ipAddress: (req.ip || req.headers['x-forwarded-for'] as string) || undefined,
+      ipAddress: req.ip,
     });
 
     res.json({ success: true, data: updated });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-// ── GET /api/settings/audit-logs ─────────────────────────
-router.get('/audit-logs', requireRole('admin'), async (_req, res) => {
-  try {
-    const logs = await db.select()
-      .from(auditLogs)
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(100);
-
+// GET /api/settings/audit-logs (admin)
+router.get(
+  '/audit-logs',
+  requireRole('admin'),
+  asyncHandler(async (_req, res) => {
+    const logs = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
     res.json({ success: true, data: logs });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+  }),
+);
 
 export default router;

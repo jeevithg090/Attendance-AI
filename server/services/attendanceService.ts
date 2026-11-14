@@ -1,163 +1,169 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Attendance Service (Core business logic)
-// ═══════════════════════════════════════════════════════════
-
+// Attendance business logic that needs the database.
+import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/connection';
-import { attendanceRecords, attendanceSessions, subjectEnrollments, subjects, users, notifications, systemSettings } from '../db/schema';
-import { eq, and, sql, count } from 'drizzle-orm';
+import {
+  attendanceRecords,
+  attendanceSessions,
+  notifications,
+  subjectEnrollments,
+  subjects,
+  users,
+} from '../db/schema';
+import { ATTENDED_STATUSES, attendancePercentage } from '../lib/attendance';
+import { forbidden, notFound } from '../http/errors';
+import type { AuthUser } from '../middleware/auth';
+import { getSettings } from './settingsService';
 
-// ── Haversine distance (meters) ──────────────────────────
-export function haversineDistance(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
-): number {
-  const R = 6371000; // Earth's radius in meters
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+export type Session = typeof attendanceSessions.$inferSelect;
+export type Subject = typeof subjects.$inferSelect;
 
-function toRad(deg: number): number {
-  return deg * (Math.PI / 180);
-}
+const attendedStatuses = [...ATTENDED_STATUSES] as ('present' | 'late')[];
 
-// ── Verify geofence ──────────────────────────────────────
-export async function verifyGeofence(
-  studentLat: number,
-  studentLng: number
-): Promise<{ withinBounds: boolean; distance: number; radius: number }> {
-  const [settings] = await db.select().from(systemSettings).where(eq(systemSettings.id, 'global')).limit(1);
-
-  if (!settings || !settings.geofencingEnabled) {
-    return { withinBounds: true, distance: 0, radius: 0 };
-  }
-
-  const distance = haversineDistance(
-    studentLat, studentLng,
-    settings.campusLat, settings.campusLng
-  );
-
-  return {
-    withinBounds: distance <= settings.campusRadius,
-    distance: Math.round(distance),
-    radius: settings.campusRadius,
-  };
-}
-
-// ── Check duplicate attendance ───────────────────────────
-export async function checkDuplicate(sessionId: string, studentId: string): Promise<boolean> {
-  const [existing] = await db.select({ id: attendanceRecords.id })
-    .from(attendanceRecords)
-    .where(and(
-      eq(attendanceRecords.sessionId, sessionId),
-      eq(attendanceRecords.studentId, studentId)
-    ))
-    .limit(1);
-
-  return !!existing;
-}
-
-// ── Check if student is enrolled in subject ──────────────
 export async function isStudentEnrolled(subjectId: string, studentId: string): Promise<boolean> {
-  const [enrollment] = await db.select({ id: subjectEnrollments.id })
+  const [row] = await db
+    .select({ id: subjectEnrollments.id })
     .from(subjectEnrollments)
-    .where(and(
-      eq(subjectEnrollments.subjectId, subjectId),
-      eq(subjectEnrollments.studentId, studentId)
-    ))
+    .where(and(eq(subjectEnrollments.subjectId, subjectId), eq(subjectEnrollments.studentId, studentId)))
     .limit(1);
-
-  return !!enrollment;
+  return Boolean(row);
 }
 
-// ── Get attendance percentage for a student in a subject ─
-export async function getAttendancePercentage(
-  subjectId: string,
-  studentId: string
-): Promise<number> {
-  const [subject] = await db.select({ totalClasses: subjects.totalClasses })
+export async function hasMarkedAttendance(sessionId: string, studentId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: attendanceRecords.id })
+    .from(attendanceRecords)
+    .where(and(eq(attendanceRecords.sessionId, sessionId), eq(attendanceRecords.studentId, studentId)))
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Number of sessions a student attended (present or late) in a subject. */
+export async function getAttendedCount(subjectId: string, studentId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: count() })
+    .from(attendanceRecords)
+    .where(
+      and(
+        eq(attendanceRecords.subjectId, subjectId),
+        eq(attendanceRecords.studentId, studentId),
+        inArray(attendanceRecords.status, attendedStatuses),
+      ),
+    );
+  return row?.count ?? 0;
+}
+
+export async function getAttendancePercentage(subjectId: string, studentId: string): Promise<number> {
+  const [subject] = await db
+    .select({ totalClasses: subjects.totalClasses })
     .from(subjects)
     .where(eq(subjects.id, subjectId))
     .limit(1);
-
-  if (!subject || subject.totalClasses === 0) return 100;
-
-  const [result] = await db.select({ count: count() })
-    .from(attendanceRecords)
-    .where(and(
-      eq(attendanceRecords.subjectId, subjectId),
-      eq(attendanceRecords.studentId, studentId),
-      eq(attendanceRecords.status, 'present')
-    ));
-
-  const presentCount = result?.count || 0;
-  return Math.round((presentCount / subject.totalClasses) * 100);
+  if (!subject) return 100;
+  return attendancePercentage(await getAttendedCount(subjectId, studentId), subject.totalClasses);
 }
 
-// ── Close session and mark absent students ───────────────
-export async function closeSession(sessionId: string) {
-  const [session] = await db.select()
+export async function getSessionOrThrow(sessionId: string): Promise<Session> {
+  const [session] = await db
+    .select()
     .from(attendanceSessions)
     .where(eq(attendanceSessions.id, sessionId))
     .limit(1);
+  if (!session) throw notFound('Session not found');
+  return session;
+}
 
-  if (!session) throw new Error('Session not found');
+export async function getSubjectOrThrow(subjectId: string): Promise<Subject> {
+  const [subject] = await db.select().from(subjects).where(eq(subjects.id, subjectId)).limit(1);
+  if (!subject) throw notFound('Subject not found');
+  return subject;
+}
 
-  // Get all enrolled students for this subject
-  const enrolledStudents = await db.select({
-    studentId: subjectEnrollments.studentId,
-    displayName: users.displayName,
-    enrollmentId: users.enrollmentId,
-  })
+/** Teachers may only manage their own subjects/sessions; admins may manage all. */
+export function assertOwnsResource(user: AuthUser, ownerId: string | null) {
+  if (user.role === 'admin') return;
+  if (user.role === 'teacher' && ownerId === user.id) return;
+  throw forbidden('You do not have permission to manage this resource');
+}
+
+/**
+ * Close an attendance session: mark every enrolled student who did not check in
+ * as absent, notify them, and update the session/subject counters.
+ * Closing an already-closed session is a no-op.
+ */
+export async function closeSession(sessionId: string): Promise<Session> {
+  const session = await getSessionOrThrow(sessionId);
+  if (session.status === 'closed') return session;
+
+  // Flip the status first so concurrent closers (cron + teacher) don't double count.
+  const [claimed] = await db
+    .update(attendanceSessions)
+    .set({ status: 'closed', endTime: new Date() })
+    .where(and(eq(attendanceSessions.id, sessionId), eq(attendanceSessions.status, 'active')))
+    .returning({ id: attendanceSessions.id });
+  if (!claimed) return getSessionOrThrow(sessionId);
+
+  const [subject] = await db
+    .update(subjects)
+    .set({ totalClasses: sql`${subjects.totalClasses} + 1` })
+    .where(eq(subjects.id, session.subjectId))
+    .returning({ totalClasses: subjects.totalClasses });
+
+  const enrolledStudents = await db
+    .select({
+      studentId: subjectEnrollments.studentId,
+      displayName: users.displayName,
+      enrollmentId: users.enrollmentId,
+    })
     .from(subjectEnrollments)
     .innerJoin(users, eq(users.id, subjectEnrollments.studentId))
     .where(eq(subjectEnrollments.subjectId, session.subjectId));
 
-  // Get students who already marked attendance
-  const markedStudents = await db.select({ studentId: attendanceRecords.studentId })
+  const existingRecords = await db
+    .select({ studentId: attendanceRecords.studentId, status: attendanceRecords.status })
     .from(attendanceRecords)
     .where(eq(attendanceRecords.sessionId, sessionId));
 
-  const markedSet = new Set(markedStudents.map(r => r.studentId));
+  const marked = new Set(existingRecords.map((r) => r.studentId));
+  const absentees = enrolledStudents.filter((s) => !marked.has(s.studentId));
 
-  // Mark absent for students who didn't mark
-  for (const student of enrolledStudents) {
-    if (!markedSet.has(student.studentId)) {
-      await db.insert(attendanceRecords).values({
-        sessionId,
-        subjectId: session.subjectId,
-        studentId: student.studentId,
-        studentName: student.displayName,
-        enrollmentId: student.enrollmentId || '',
-        date: session.date,
-        status: 'absent',
-        verificationMethod: 'manual_override',
-        faceMatchScore: 0,
-        faceMatchThreshold: 0,
-        flagged: false,
-      });
+  if (absentees.length > 0) {
+    await db
+      .insert(attendanceRecords)
+      .values(
+        absentees.map((s) => ({
+          sessionId,
+          subjectId: session.subjectId,
+          studentId: s.studentId,
+          studentName: s.displayName,
+          enrollmentId: s.enrollmentId ?? '',
+          date: session.date,
+          status: 'absent' as const,
+          verificationMethod: 'manual_override' as const,
+          flagged: false,
+        })),
+      )
+      .onConflictDoNothing();
 
-      // Create absent notification
-      await db.insert(notifications).values({
-        recipientId: student.studentId,
+    const settings = await getSettings();
+    const totalClasses = subject?.totalClasses ?? 0;
+    const alerts: (typeof notifications.$inferInsert)[] = [];
+
+    for (const s of absentees) {
+      alerts.push({
+        recipientId: s.studentId,
         type: 'absent_alert',
         title: 'Absent from Class',
         message: `You were marked absent for ${session.subjectName} (${session.subjectCode}) on ${session.date}`,
         metadata: { sessionId, subjectId: session.subjectId },
       });
 
-      // Check low attendance
-      const percentage = await getAttendancePercentage(session.subjectId, student.studentId);
-      const [settings] = await db.select().from(systemSettings).where(eq(systemSettings.id, 'global')).limit(1);
-
-      if (settings && percentage < settings.minimumAttendancePercent) {
-        await db.insert(notifications).values({
-          recipientId: student.studentId,
+      const percentage = attendancePercentage(
+        await getAttendedCount(session.subjectId, s.studentId),
+        totalClasses,
+      );
+      if (percentage < settings.minimumAttendancePercent) {
+        alerts.push({
+          recipientId: s.studentId,
           type: 'low_attendance',
           title: 'Low Attendance Warning',
           message: `Your attendance in ${session.subjectName} is ${percentage}%, below the minimum ${settings.minimumAttendancePercent}%`,
@@ -165,22 +171,14 @@ export async function closeSession(sessionId: string) {
         });
       }
     }
+    await db.insert(notifications).values(alerts);
   }
 
-  // Update session status
-  const presentCount = markedStudents.filter(s => markedSet.has(s.studentId)).length;
-  await db.update(attendanceSessions)
-    .set({
-      status: 'closed',
-      endTime: new Date(),
-      totalPresent: presentCount,
-    })
-    .where(eq(attendanceSessions.id, sessionId));
-
-  // Increment totalClasses for the subject
-  await db.update(subjects)
-    .set({
-      totalClasses: sql`${subjects.totalClasses} + 1`,
-    })
-    .where(eq(subjects.id, session.subjectId));
+  const presentCount = existingRecords.filter((r) => attendedStatuses.includes(r.status as 'present')).length;
+  const [updated] = await db
+    .update(attendanceSessions)
+    .set({ totalPresent: presentCount })
+    .where(eq(attendanceSessions.id, sessionId))
+    .returning();
+  return updated;
 }

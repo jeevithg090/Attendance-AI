@@ -1,42 +1,35 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Session Cleanup Job (every 5 minutes)
-// ═══════════════════════════════════════════════════════════
-
+// Closes sessions whose attendance window has elapsed (runs every 5 minutes).
+import { and, eq, lt } from 'drizzle-orm';
 import { db } from '../db/connection';
-import { attendanceSessions, systemSettings } from '../db/schema';
-import { eq, and, lt } from 'drizzle-orm';
+import { attendanceSessions } from '../db/schema';
 import { closeSession } from '../services/attendanceService';
+import { getSettings } from '../services/settingsService';
+import { broadcastToSession } from '../routes/sse';
 
-export async function cleanupExpiredSessions() {
+export async function cleanupExpiredSessions(): Promise<number> {
   try {
-    const [settings] = await db.select().from(systemSettings)
-      .where(eq(systemSettings.id, 'global')).limit(1);
+    const settings = await getSettings();
+    const cutoff = new Date(Date.now() - settings.attendanceWindowMinutes * 60_000);
 
-    const windowMinutes = settings?.attendanceWindowMinutes || 30;
-
-    // Find active sessions that have expired
-    const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000);
-
-    const expiredSessions = await db.select({ id: attendanceSessions.id })
+    const expired = await db
+      .select({ id: attendanceSessions.id })
       .from(attendanceSessions)
-      .where(and(
-        eq(attendanceSessions.status, 'active'),
-        lt(attendanceSessions.startTime, cutoff)
-      ));
+      .where(and(eq(attendanceSessions.status, 'active'), lt(attendanceSessions.startTime, cutoff)));
 
-    for (const session of expiredSessions) {
+    let closed = 0;
+    for (const { id } of expired) {
       try {
-        await closeSession(session.id);
-        console.log(`[SessionCleanup] Closed expired session ${session.id}`);
+        const session = await closeSession(id);
+        broadcastToSession(id, { type: 'session_closed', data: session });
+        closed++;
       } catch (error) {
-        console.error(`[SessionCleanup] Error closing session ${session.id}:`, error);
+        console.error(`[SessionCleanup] Error closing session ${id}:`, error);
       }
     }
-
-    if (expiredSessions.length > 0) {
-      console.log(`[SessionCleanup] Closed ${expiredSessions.length} expired sessions`);
-    }
+    if (closed > 0) console.log(`[SessionCleanup] Closed ${closed} expired session(s)`);
+    return closed;
   } catch (error) {
     console.error('[SessionCleanup] Error:', error);
+    return 0;
   }
 }

@@ -1,140 +1,100 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Auth Routes
-// ═══════════════════════════════════════════════════════════
-
+// Authentication & profile routes.
 import { Router } from 'express';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/connection';
 import { users } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { hashPassword, verifyPassword, generateToken } from '../services/authService';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { asyncHandler, conflict, HttpError, isUniqueViolation, notFound } from '../http/errors';
+import { loginSchema, profileUpdateSchema, registerSchema } from '../http/validation';
+import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { currentUser, requireRole } from '../middleware/rbac';
+import { dummyHash, generateToken, hashPassword, verifyPassword } from '../services/authService';
+import { toPublicUser } from '../services/userService';
 
 const router = Router();
 
-// ── POST /api/auth/login ─────────────────────────────────
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
+// POST /api/auth/login
+router.post(
+  '/login',
+  asyncHandler(async (req, res) => {
+    const { email, password } = loginSchema.parse(req.body);
 
-    if (!email || !password) {
-      res.status(400).json({ success: false, error: 'Email and password required' });
-      return;
-    }
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${email}`)
+      .limit(1);
 
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-
-    if (!user) {
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
-      return;
-    }
-
-    if (!user.isActive) {
-      res.status(403).json({ success: false, error: 'Account deactivated. Contact administrator.' });
-      return;
-    }
-
-    const passwordValid = await verifyPassword(password, user.passwordHash);
-    if (!passwordValid) {
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
-      return;
-    }
+    // Always run bcrypt so response time doesn't reveal whether the email exists.
+    const passwordValid = await verifyPassword(password, user?.passwordHash ?? (await dummyHash()));
+    if (!user || !passwordValid) throw new HttpError(401, 'Invalid credentials');
+    if (!user.isActive) throw new HttpError(403, 'Account deactivated. Contact administrator.');
 
     const token = generateToken({ userId: user.id, email: user.email, role: user.role });
+    res.json({ success: true, data: { token, user: toPublicUser(user) } });
+  }),
+);
 
-    const { passwordHash: _, ...userWithoutPassword } = user;
-    res.json({
-      success: true,
-      data: {
-        token,
-        user: userWithoutPassword,
-      },
-    });
-  } catch (error: any) {
-    console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error',
-      details: error.message,
-      stack: error.stack
-    });
-  }
-});
+// POST /api/auth/register (admin only)
+router.post(
+  '/register',
+  authenticate,
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const input = registerSchema.parse(req.body);
 
-// ── POST /api/auth/register (admin only) ─────────────────
-router.post('/register', authenticate, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const { email, password, displayName, role, department, enrollmentId, employeeId, phone } = req.body;
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`lower(${users.email}) = ${input.email}`)
+      .limit(1);
+    if (existing) throw conflict('Email already registered');
 
-    if (!email || !password || !displayName || !role || !department) {
-      res.status(400).json({ success: false, error: 'Missing required fields' });
-      return;
+    try {
+      const [created] = await db
+        .insert(users)
+        .values({
+          email: input.email,
+          passwordHash: await hashPassword(input.password),
+          displayName: input.displayName,
+          role: input.role,
+          department: input.department,
+          enrollmentId: input.role === 'student' ? input.enrollmentId || null : null,
+          employeeId: input.role === 'teacher' ? input.employeeId || null : null,
+          phone: input.phone || null,
+        })
+        .returning();
+      res.status(201).json({ success: true, data: toPublicUser(created) });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw conflict('Email, enrollment ID or employee ID already exists');
+      throw error;
     }
+  }),
+);
 
-    // Check if email already exists
-    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-    if (existing) {
-      res.status(409).json({ success: false, error: 'Email already registered' });
-      return;
-    }
+// GET /api/auth/me
+router.get(
+  '/me',
+  authenticate,
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const [user] = await db.select().from(users).where(eq(users.id, currentUser(req).id)).limit(1);
+    if (!user) throw notFound('User not found');
+    res.json({ success: true, data: toPublicUser(user) });
+  }),
+);
 
-    const hashedPassword = await hashPassword(password);
-
-    const [newUser] = await db.insert(users).values({
-      email,
-      passwordHash: hashedPassword,
-      displayName,
-      role,
-      department,
-      enrollmentId: role === 'student' ? enrollmentId : null,
-      employeeId: role === 'teacher' ? employeeId : null,
-      phone,
-    }).returning();
-
-    const { passwordHash: _, ...userWithoutPassword } = newUser;
-    res.status(201).json({ success: true, data: userWithoutPassword });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── GET /api/auth/me ─────────────────────────────────────
-router.get('/me', authenticate, async (req: AuthenticatedRequest, res) => {
-  try {
-    const [user] = await db.select().from(users).where(eq(users.id, req.user!.id)).limit(1);
-    if (!user) {
-      res.status(404).json({ success: false, error: 'User not found' });
-      return;
-    }
-
-    const { passwordHash: _, ...userWithoutPassword } = user;
-    res.json({ success: true, data: userWithoutPassword });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ── PUT /api/auth/profile ────────────────────────────────
-router.put('/profile', authenticate, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { displayName, phone, photoUrl } = req.body;
-
-    const [updated] = await db.update(users)
-      .set({
-        ...(displayName && { displayName }),
-        ...(phone !== undefined && { phone }),
-        ...(photoUrl !== undefined && { photoUrl }),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, req.user!.id))
+// PUT /api/auth/profile
+router.put(
+  '/profile',
+  authenticate,
+  asyncHandler<AuthenticatedRequest>(async (req, res) => {
+    const input = profileUpdateSchema.parse(req.body);
+    const [updated] = await db
+      .update(users)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(users.id, currentUser(req).id))
       .returning();
-
-    const { passwordHash: _, ...userWithoutPassword } = updated;
-    res.json({ success: true, data: userWithoutPassword });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+    res.json({ success: true, data: toPublicUser(updated) });
+  }),
+);
 
 export default router;

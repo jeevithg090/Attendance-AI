@@ -1,28 +1,19 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — Token Refresh Job (every 60 seconds)
-// ═══════════════════════════════════════════════════════════
-
-import { db } from '../db/connection';
-import { attendanceSessions, systemSettings } from '../db/schema';
+// Rotates the token of every active session (runs every minute).
 import { eq, sql } from 'drizzle-orm';
+import { db } from '../db/connection';
+import { attendanceSessions } from '../db/schema';
+import { getSettings } from '../services/settingsService';
 
-export async function refreshSessionTokens() {
+export async function refreshSessionTokens(): Promise<void> {
   try {
-    const [settings] = await db.select().from(systemSettings)
-      .where(eq(systemSettings.id, 'global')).limit(1);
-
-    const refreshSeconds = settings?.sessionTokenRefreshSeconds || 60;
-    const tokenExpiry = new Date(Date.now() + refreshSeconds * 1000);
-
-    // Update all active sessions with new tokens
-    await db.update(attendanceSessions)
+    const settings = await getSettings();
+    await db
+      .update(attendanceSessions)
       .set({
         sessionToken: sql`gen_random_uuid()`,
-        tokenExpiresAt: tokenExpiry,
+        tokenExpiresAt: new Date(Date.now() + settings.sessionTokenRefreshSeconds * 1000),
       })
       .where(eq(attendanceSessions.status, 'active'));
-
-    console.log(`[TokenRefresh] Refreshed tokens at ${new Date().toISOString()}`);
   } catch (error) {
     console.error('[TokenRefresh] Error:', error);
   }

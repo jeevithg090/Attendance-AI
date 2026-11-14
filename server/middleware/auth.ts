@@ -1,73 +1,83 @@
-// ═══════════════════════════════════════════════════════════
-// AttendAI — JWT Authentication Middleware
-// ═══════════════════════════════════════════════════════════
-
-import { Request, Response, NextFunction } from 'express';
+// JWT authentication middleware.
+import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/connection';
 import { users } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { verifyToken, type Role } from '../services/authService';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: 'student' | 'teacher' | 'admin';
-    displayName: string;
-    department: string;
-  };
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: Role;
+  displayName: string;
+  department: string;
 }
 
-export async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  try {
-    let token: string;
-    
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-      token = req.headers.authorization.split(' ')[1];
-    } else if (req.query.token && typeof req.query.token === 'string') {
-      token = req.query.token;
-    } else {
+export interface AuthenticatedRequest extends Request {
+  user?: AuthUser;
+}
+
+function extractToken(req: Request, allowQueryToken: boolean): string | null {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) return header.slice('Bearer '.length).trim();
+  // EventSource cannot send headers, so SSE endpoints accept ?token=.
+  if (allowQueryToken && typeof req.query.token === 'string') return req.query.token;
+  return null;
+}
+
+function createAuthenticator(allowQueryToken: boolean) {
+  return async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    const token = extractToken(req, allowQueryToken);
+    if (!token) {
       res.status(401).json({ success: false, error: 'No token provided' });
       return;
     }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string;
-      email: string;
-      role: string;
-    };
 
-    const [user] = await db.select({
-      id: users.id,
-      email: users.email,
-      role: users.role,
-      displayName: users.displayName,
-      department: users.department,
-      isActive: users.isActive,
-    }).from(users).where(eq(users.id, decoded.userId)).limit(1);
-
-    if (!user || !user.isActive) {
-      res.status(401).json({ success: false, error: 'User not found or deactivated' });
+    let payload;
+    try {
+      payload = verifyToken(token);
+    } catch (error) {
+      const expired = error instanceof jwt.TokenExpiredError;
+      res.status(401).json({ success: false, error: expired ? 'Token expired' : 'Invalid token' });
       return;
     }
 
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role as 'student' | 'teacher' | 'admin',
-      displayName: user.displayName,
-      department: user.department,
-    };
+    try {
+      const [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          role: users.role,
+          displayName: users.displayName,
+          department: users.department,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .where(eq(users.id, payload.userId))
+        .limit(1);
 
-    next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      res.status(401).json({ success: false, error: 'Token expired' });
-      return;
+      if (!user || !user.isActive) {
+        res.status(401).json({ success: false, error: 'User not found or deactivated' });
+        return;
+      }
+
+      req.user = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        displayName: user.displayName,
+        department: user.department,
+      };
+      next();
+    } catch (error) {
+      next(error);
     }
-    if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ success: false, error: 'Invalid token' });
-      return;
-    }
-    res.status(500).json({ success: false, error: 'Authentication failed' });
-  }
+  };
 }
+
+/** Requires `Authorization: Bearer <jwt>`. */
+export const authenticate = createAuthenticator(false);
+
+/** Like `authenticate`, but also accepts `?token=` for EventSource clients. */
+export const authenticateSse = createAuthenticator(true);
