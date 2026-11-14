@@ -10,6 +10,7 @@ import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { useAuthStore } from './store/authStore';
 import type { UserRole } from './types';
 import './index.css';
+import './store/themeStore';
 
 // Route-level code splitting keeps face-api.js out of the initial bundle.
 const Login = lazy(() => import('./pages/auth/Login'));
@@ -75,13 +76,26 @@ function App() {
       <RouteTitle />
       <Toaster
         position="top-right"
+        containerStyle={{ top: 72 }}
         toastOptions={{
-          className: 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)]',
           duration: 4000,
+          style: {
+            background: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-light)',
+            boxShadow: 'var(--shadow-lg)',
+            fontSize: '0.875rem',
+          },
         }}
       />
 
-      <Suspense fallback={<LoadingSpinner message="Loading..." />}>
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <LoadingSpinner message="Loading…" />
+          </div>
+        }
+      >
         <Routes>
           <Route
             path="/login"

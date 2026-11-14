@@ -2,50 +2,131 @@
    AttendAI — Global Styles & Design System
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Google Fonts ──────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Fonts (DM Sans, JetBrains Mono) are loaded with <link> tags in index.html. */
 
 @import 'tailwindcss';
 
-/* ── CSS Variables ─────────────────────────────────────── */
+/* ── Design tokens ─────────────────────────────────────
+   Dark is the default theme; light is applied with
+   <html data-theme="light"> (see src/store/themeStore.ts).
+   Text tokens are chosen to meet WCAG AA (>= 4.5:1) on
+   --bg-primary, --bg-surface and --bg-elevated. */
 :root {
+  color-scheme: dark;
+
+  /* Surfaces */
   --bg-primary: #0a0f1e;
   --bg-surface: #111827;
   --bg-elevated: #1f2937;
   --bg-elevated-2: #283548;
-  --accent-primary: #4f46e5;
-  --accent-primary-hover: #6366f1;
+  --bg-overlay: rgba(10, 15, 30, 0.8);
+  --bg-glass: rgba(17, 24, 39, 0.7);
+  --bg-hover: rgba(255, 255, 255, 0.03);
+
+  /* Brand & status */
+  --accent-primary: #818cf8; /* text, icons, focus rings */
+  --accent-primary-hover: #a5b4fc;
+  --accent-primary-solid: #4f46e5; /* filled buttons (white text 6.3:1) */
+  --accent-primary-solid-hover: #4338ca;
   --accent-primary-glow: rgba(79, 70, 229, 0.3);
+  --accent-primary-soft: rgba(99, 102, 241, 0.15);
   --accent-success: #10b981;
+  --accent-success-solid: #047857;
   --accent-success-glow: rgba(16, 185, 129, 0.3);
   --accent-danger: #f43f5e;
+  --accent-danger-solid: #e11d48;
   --accent-danger-glow: rgba(244, 63, 94, 0.3);
   --accent-warning: #f59e0b;
   --accent-warning-glow: rgba(245, 158, 11, 0.3);
   --accent-info: #38bdf8;
   --accent-info-glow: rgba(56, 189, 248, 0.3);
+
+  /* Text */
   --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-secondary: #b4bcc8;
+  --text-muted: #8b95a5;
+  --text-on-accent: #ffffff;
+
+  /* Lines */
   --border: #1f2937;
   --border-light: #374151;
   --border-glow: rgba(79, 70, 229, 0.15);
-  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Typography */
+  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Shape */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-full: 9999px;
+
+  /* Elevation */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
   --shadow-glow-primary: 0 0 20px var(--accent-primary-glow);
   --shadow-glow-success: 0 0 20px var(--accent-success-glow);
   --shadow-glow-danger: 0 0 20px var(--accent-danger-glow);
+
+  /* Motion */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-primary: #f5f6fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f2f7;
+  --bg-elevated-2: #e4e8f0;
+  --bg-overlay: rgba(255, 255, 255, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-hover: rgba(15, 23, 42, 0.03);
+
+  --accent-primary: #4f46e5;
+  --accent-primary-hover: #4338ca;
+  --accent-danger-solid: #be123c;
+  --accent-primary-glow: rgba(79, 70, 229, 0.18);
+  --accent-primary-soft: rgba(79, 70, 229, 0.1);
+  --accent-success: #047857;
+  --accent-success-glow: rgba(4, 120, 87, 0.15);
+  --accent-danger: #be123c;
+  --accent-danger-glow: rgba(190, 18, 60, 0.15);
+  --accent-warning: #b45309;
+  --accent-warning-glow: rgba(180, 83, 9, 0.15);
+  --accent-info: #0369a1;
+  --accent-info-glow: rgba(3, 105, 161, 0.15);
+
+  --text-primary: #0f172a;
+  --text-secondary: #3f4a5c;
+  --text-muted: #5b6577;
+
+  --border: #e3e7ee;
+  --border-light: #d3d9e3;
+  --border-glow: rgba(79, 70, 229, 0.12);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  /* Status tints are written as e.g. text-emerald-400 for the dark theme.
+     Remap those light shades to darker ones so text stays AA on white. */
+  --color-emerald-400: oklch(50.8% 0.118 165.612);
+  --color-emerald-500: oklch(50.8% 0.118 165.612);
+  --color-rose-400: oklch(51.4% 0.222 16.935);
+  --color-rose-500: oklch(51.4% 0.222 16.935);
+  --color-amber-400: oklch(55.5% 0.163 48.998);
+  --color-amber-500: oklch(55.5% 0.163 48.998);
+  --color-indigo-400: oklch(51.1% 0.262 276.966);
+  --color-sky-400: oklch(50% 0.134 242.749);
+  --color-pink-400: oklch(52.5% 0.223 3.958);
+  --color-purple-400: oklch(49.6% 0.265 301.924);
+  --color-gray-400: oklch(44.6% 0.03 256.802);
 }
 
 @layer base {
@@ -328,10 +409,10 @@
 
   /* ── Glassmorphism ─────────────────────────────────────── */
   .glass {
-    background: rgba(17, 24, 39, 0.7);
+    background: var(--bg-glass);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
   }
 
   .glass-elevated {
@@ -535,14 +616,14 @@
   }
 
   .sidebar-item.active {
-    background: rgba(79, 70, 229, 0.15);
+    background: var(--accent-primary-soft);
     color: var(--accent-primary);
-    border: 1px solid rgba(79, 70, 229, 0.2);
+    box-shadow: inset 0 0 0 1px var(--border-glow);
   }
 
   /* ── Navbar ────────────────────────────────────────────── */
   .navbar {
-    background: rgba(10, 15, 30, 0.8);
+    background: var(--bg-overlay);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
@@ -573,10 +654,20 @@
   }
 
   /* ── Table ─────────────────────────────────────────────── */
+  /* Tables always sit inside a Card, which provides the border. */
   .table-container {
     overflow-x: auto;
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-container:first-child {
+    border-top-left-radius: var(--radius-xl);
+    border-top-right-radius: var(--radius-xl);
+  }
+
+  .table-container:last-child {
+    border-bottom-left-radius: var(--radius-xl);
+    border-bottom-right-radius: var(--radius-xl);
   }
 
   .table {
@@ -601,27 +692,130 @@
     font-size: 0.75rem;
     letter-spacing: 0.05em;
     border-bottom: 1px solid var(--border-light);
+    white-space: nowrap;
   }
 
   .table td {
     padding: 0.875rem 1rem;
+    vertical-align: middle;
     border-bottom: 1px solid var(--border);
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
 
   .table tr:hover td {
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-hover);
   }
 
   .table tr:last-child td {
     border-bottom: none;
   }
 
+  /* ── Form states ───────────────────────────────────────── */
+  .input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .input[aria-invalid='true'] {
+    border-color: var(--accent-danger);
+  }
+
+  .input[aria-invalid='true']:focus {
+    box-shadow: 0 0 0 3px var(--accent-danger-glow);
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .field-hint {
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .field-error {
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent-danger);
+  }
+
+  /* ── Toolbar above tables ─────────────────────────────── */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
   /* ── Responsive ────────────────────────────────────────── */
   @media (max-width: 768px) {
     .hide-mobile {
       display: none !important;
+    }
+  }
+
+  /* Phones: show each table row as a stacked card with inline labels. */
+  @media (max-width: 639px) {
+    .table-responsive thead {
+      display: none;
+    }
+    .table-responsive,
+    .table-responsive tbody,
+    .table-responsive tr,
+    .table-responsive td {
+      display: block;
+      width: 100%;
+    }
+    .table-responsive tr {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .table-responsive tr:last-child {
+      border-bottom: none;
+    }
+    .table-responsive td {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.375rem 0;
+      border-bottom: none;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    .table-responsive td > * {
+      min-width: 0;
+    }
+    .table-responsive td::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      text-align: left;
+    }
+    .table-responsive td:first-child {
+      padding-bottom: 0.5rem;
+      text-align: left;
+    }
+    .table-responsive td:first-child::before {
+      display: none;
+    }
+    .table-responsive tr:hover td {
+      background: transparent;
     }
   }
 
