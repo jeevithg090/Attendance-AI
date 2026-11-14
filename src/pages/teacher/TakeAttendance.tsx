@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useSSE } from '../../hooks/useSSE';
 import Card from '../../components/ui/Card';
@@ -11,9 +11,10 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Table from '../../components/ui/Table';
 import Modal from '../../components/ui/Modal';
+import EmptyState from '../../components/ui/EmptyState';
 import api, { getErrorMessage } from '../../api/client';
 import type { AttendanceRecord, AttendanceSession, Subject } from '../../types';
-import { Play, Square, Users, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Play, Square, Users, CheckCircle2, AlertTriangle, RefreshCw, BookMarked } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { BadgeVariant } from '../../components/ui/Badge';
 
@@ -34,6 +35,10 @@ export default function TakeAttendance() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [subjectsLoaded, setSubjectsLoaded] = useState(false);
+  const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [overrideRecord, setOverrideRecord] = useState<AttendanceRecord | null>(null);
@@ -69,8 +74,10 @@ export default function TakeAttendance() {
       try {
         const { data } = await api.get('/subjects/my-subjects');
         setSubjects(data.data);
-      } catch {
-        /* ignore */
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Failed to load your subjects'));
+      } finally {
+        setSubjectsLoaded(true);
       }
 
       // If sessionId in URL, fetch it
@@ -113,23 +120,26 @@ export default function TakeAttendance() {
 
   const handleCloseSession = async () => {
     if (!currentSession) return;
-
-    if (
-      window.confirm(
-        "Are you sure you want to close this session? Any student who hasn't marked attendance will be marked absent.",
-      )
-    ) {
-      try {
-        await closeSession(currentSession.id);
-        toast.success('Session closed successfully');
-        // Refresh session data
-        const { data } = await api.get(`/sessions/${currentSession.id}`);
-        setCurrentSession(data.data);
-        fetchSessionRecords(currentSession.id);
-      } catch (error) {
-        toast.error(getErrorMessage(error, 'Failed to close session'));
-      }
+    setIsClosing(true);
+    try {
+      await closeSession(currentSession.id);
+      toast.success('Session closed. Students who did not check in were marked absent.');
+      const { data } = await api.get(`/sessions/${currentSession.id}`);
+      setCurrentSession(data.data);
+      fetchSessionRecords(currentSession.id);
+      setIsConfirmCloseOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to close session'));
+    } finally {
+      setIsClosing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!currentSession) return;
+    setIsRefreshing(true);
+    await fetchSessionRecords(currentSession.id);
+    setIsRefreshing(false);
   };
 
   const openOverrideModal = (record: AttendanceRecord) => {
@@ -180,7 +190,7 @@ export default function TakeAttendance() {
 
         return (
           <Badge variant={variant} className="uppercase">
-            {r.status.replace('_', ' ')}
+            {r.status === 'proxy_detected' ? 'proxy' : r.status}
           </Badge>
         );
       },
@@ -201,8 +211,8 @@ export default function TakeAttendance() {
             className="flex items-center gap-1.5 text-rose-400 text-xs font-medium"
             title={r.flagReason || ''}
           >
-            <AlertTriangle size={14} />
-            <span className="truncate max-w-[150px]">{r.flagReason}</span>
+            <AlertTriangle size={14} aria-hidden="true" className="shrink-0" />
+            <span className="truncate max-w-[220px]">{r.flagReason}</span>
           </div>
         ) : (
           <span className="text-[var(--text-muted)] text-xs">-</span>
@@ -213,7 +223,12 @@ export default function TakeAttendance() {
       header: 'Actions',
       width: '100px',
       render: (r: AttendanceRecord) => (
-        <Button variant="ghost" size="sm" onClick={() => openOverrideModal(r)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openOverrideModal(r)}
+          aria-label={`Override attendance for ${r.studentName}`}
+        >
           Override
         </Button>
       ),
@@ -224,47 +239,71 @@ export default function TakeAttendance() {
     <div className="space-y-6">
       {!currentSession ? (
         // Start Session View
-        <div className="max-w-2xl mx-auto space-y-6 mt-8">
+        <div className="max-w-2xl mx-auto space-y-6 sm:mt-6">
           <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4">
+            <div
+              className="w-16 h-16 rounded-2xl bg-[var(--accent-primary-soft)] text-[var(--accent-primary)] flex items-center justify-center mx-auto mb-4"
+              aria-hidden="true"
+            >
               <Play size={32} />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Start Attendance Session</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight mb-2">Start Attendance Session</h1>
             <p className="text-[var(--text-muted)]">
-              Select a subject to begin taking live attendance via face recognition.
+              Pick a subject. Enrolled students can then check in with a face scan for the next few minutes.
             </p>
           </div>
 
           <Card>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Select Subject
-                </label>
-                <select
-                  className="input"
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                >
-                  <option value="">-- Choose Subject --</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {subjectsLoaded && subjects.length === 0 ? (
+              <EmptyState
+                icon={<BookMarked size={24} />}
+                title="You have no subjects yet"
+                description="Create a subject and enrol students before starting a session."
+                action={
+                  <Link
+                    to="/teacher/manage-subjects"
+                    className="inline-flex items-center min-h-10 px-4 rounded-[var(--radius-md)] bg-[var(--accent-primary-solid)] hover:bg-[var(--accent-primary-solid-hover)] text-white text-sm font-medium"
+                  >
+                    Go to Manage Subjects
+                  </Link>
+                }
+                className="py-4"
+              />
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="take-attendance-select-subject"
+                    className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+                  >
+                    Select Subject
+                  </label>
+                  <select
+                    id="take-attendance-select-subject"
+                    className="input"
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                  >
+                    <option value="">-- Choose Subject --</option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleCreateSession}
-                isLoading={isCreating}
-                disabled={!selectedSubject}
-              >
-                Start Session Now
-              </Button>
-            </div>
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={handleCreateSession}
+                  isLoading={isCreating}
+                  disabled={!selectedSubject || !subjectsLoaded}
+                >
+                  Start session now
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       ) : (
@@ -273,7 +312,7 @@ export default function TakeAttendance() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold">{currentSession.subjectName}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{currentSession.subjectName}</h1>
                 <Badge
                   variant={currentSession.status === 'active' ? 'present' : 'default'}
                   dot={currentSession.status === 'active'}
@@ -282,8 +321,10 @@ export default function TakeAttendance() {
                 </Badge>
               </div>
               <p className="text-[var(--text-muted)] text-sm">
-                Session Code: <span className="font-mono">{currentSession.subjectCode}</span>
-                <span className="mx-2">•</span>
+                Subject code: <span className="font-mono">{currentSession.subjectCode}</span>
+                <span className="mx-2" aria-hidden="true">
+                  •
+                </span>
                 Started: {new Date(currentSession.startTime).toLocaleTimeString()}
               </p>
             </div>
@@ -291,18 +332,19 @@ export default function TakeAttendance() {
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => fetchSessionRecords(currentSession.id)}
-                icon={<RefreshCw size={16} />}
+                onClick={handleRefresh}
+                isLoading={isRefreshing}
+                icon={<RefreshCw size={16} aria-hidden="true" />}
               >
                 Refresh
               </Button>
               {currentSession.status === 'active' && (
                 <Button
                   variant="danger"
-                  onClick={handleCloseSession}
-                  icon={<Square size={16} fill="currentColor" />}
+                  onClick={() => setIsConfirmCloseOpen(true)}
+                  icon={<Square size={16} fill="currentColor" aria-hidden="true" />}
                 >
-                  End Session
+                  End session
                 </Button>
               )}
             </div>
@@ -311,7 +353,7 @@ export default function TakeAttendance() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card padding="sm" className="flex items-center gap-4">
               <div className="p-3 bg-indigo-500/15 text-indigo-400 rounded-[var(--radius-md)]">
-                <Users size={24} />
+                <Users size={24} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-[var(--text-muted)] font-medium">Total Enrolled</p>
@@ -321,7 +363,7 @@ export default function TakeAttendance() {
 
             <Card padding="sm" className="flex items-center gap-4">
               <div className="p-3 bg-emerald-500/15 text-emerald-400 rounded-[var(--radius-md)]">
-                <CheckCircle2 size={24} />
+                <CheckCircle2 size={24} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-[var(--text-muted)] font-medium">Present</p>
@@ -331,7 +373,7 @@ export default function TakeAttendance() {
 
             <Card padding="sm" className="flex items-center gap-4">
               <div className="p-3 bg-rose-500/15 text-rose-400 rounded-[var(--radius-md)]">
-                <AlertTriangle size={24} />
+                <AlertTriangle size={24} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-[var(--text-muted)] font-medium">Flagged Issues</p>
@@ -343,17 +385,21 @@ export default function TakeAttendance() {
           </div>
 
           <Card padding="none">
-            <div className="p-4 border-b border-[var(--border)] bg-[var(--bg-elevated)] rounded-t-[var(--radius-xl)] flex justify-between items-center">
-              <h3 className="font-semibold">Live Attendance Log</h3>
+            <div className="toolbar justify-between">
+              <h2 className="font-semibold">Live attendance log</h2>
               {currentSession.status === 'active' && (
-                <span className="text-xs text-[var(--text-muted)] flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-dot" />
+                <span className="text-xs text-[var(--text-muted)] flex items-center gap-2" aria-live="polite">
+                  <span
+                    className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-dot"
+                    aria-hidden="true"
+                  />
                   Waiting for students...
                 </span>
               )}
             </div>
 
             <Table
+              caption="Attendance records for this session"
               columns={columns}
               data={sessionRecords}
               keyExtractor={(r) => r.id}
@@ -384,10 +430,14 @@ export default function TakeAttendance() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              <label
+                htmlFor="take-attendance-new-status"
+                className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+              >
                 New Status
               </label>
               <select
+                id="take-attendance-new-status"
                 className="input"
                 value={overrideStatus}
                 onChange={(e) => setOverrideStatus(e.target.value)}
@@ -399,12 +449,16 @@ export default function TakeAttendance() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              <label
+                htmlFor="take-attendance-reason-for-override"
+                className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+              >
                 Reason for Override
               </label>
               <textarea
-                className="input min-h-[100px] resize-none"
-                placeholder="e.g. Device issue, manual verification..."
+                id="take-attendance-reason-for-override"
+                className="input min-h-[100px] resize-y"
+                placeholder="e.g. Camera failed; verified in person"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
                 required
@@ -421,6 +475,27 @@ export default function TakeAttendance() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Confirm end of session */}
+      <Modal
+        isOpen={isConfirmCloseOpen}
+        onClose={() => setIsConfirmCloseOpen(false)}
+        title="End this session?"
+        size="sm"
+      >
+        <p className="text-sm text-[var(--text-secondary)]">
+          Students who have not checked in yet will be marked <strong>absent</strong> and notified. This
+          cannot be undone, but you can still override individual records afterwards.
+        </p>
+        <div className="pt-5 mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t border-[var(--border)]">
+          <Button variant="ghost" onClick={() => setIsConfirmCloseOpen(false)}>
+            Keep session open
+          </Button>
+          <Button variant="danger" onClick={handleCloseSession} isLoading={isClosing}>
+            End session
+          </Button>
+        </div>
       </Modal>
     </div>
   );

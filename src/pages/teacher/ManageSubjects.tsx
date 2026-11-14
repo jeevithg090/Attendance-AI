@@ -7,6 +7,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Table from '../../components/ui/Table';
 import Modal from '../../components/ui/Modal';
+import PageHeader from '../../components/ui/PageHeader';
 import api, { getErrorMessage } from '../../api/client';
 import { BookMarked, Plus, Users, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -69,31 +70,36 @@ export default function ManageSubjects() {
 
     setIsSubmitting(true);
     try {
-      // For demo, we assume the user is inputting UUIDs comma separated,
-      // but in a real app this would be a multi-select dropdown or search.
-      // To make it easy to test, we'll fetch all students and match by USN/Email
+      // Match the typed USNs / emails against the student directory.
+      const { data: usersData } = await api.get('/users?role=student&limit=200');
+      const allStudents: User[] = usersData.data.items;
 
-      const { data: usersData } = await api.get('/users?role=student&limit=100');
-      const allStudents = usersData.data.items;
-
-      const inputIds = enrollStudentIds.split(',').map((s) => s.trim().toLowerCase());
-
-      const matchedIds = allStudents
-        .filter(
-          (s: User) =>
-            inputIds.includes((s.enrollmentId ?? '').toLowerCase()) ||
-            inputIds.includes(s.email.toLowerCase()),
-        )
-        .map((s: User) => s.id);
-
-      if (matchedIds.length === 0) {
-        toast.error('No valid students found matching those IDs/Emails');
-        setIsSubmitting(false);
+      const inputIds = enrollStudentIds
+        .split(/[,\n]/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+      if (inputIds.length === 0) {
+        toast.error('Enter at least one USN or email');
         return;
       }
 
-      await api.post(`/subjects/${selectedSubject.id}/enroll`, { studentIds: matchedIds });
-      toast.success(`Successfully enrolled ${matchedIds.length} students`);
+      const matches = allStudents.filter(
+        (s) =>
+          inputIds.includes((s.enrollmentId ?? '').toLowerCase()) || inputIds.includes(s.email.toLowerCase()),
+      );
+      const matchedKeys = new Set(
+        matches.flatMap((s) => [(s.enrollmentId ?? '').toLowerCase(), s.email.toLowerCase()]),
+      );
+      const unmatched = inputIds.filter((id) => !matchedKeys.has(id));
+
+      if (matches.length === 0) {
+        toast.error('No students found with those USNs or emails');
+        return;
+      }
+
+      await api.post(`/subjects/${selectedSubject.id}/enroll`, { studentIds: matches.map((s) => s.id) });
+      toast.success(`Enrolled ${matches.length} student${matches.length === 1 ? '' : 's'}`);
+      if (unmatched.length > 0) toast.error(`Not found: ${unmatched.join(', ')}`, { duration: 6000 });
       setIsEnrollModalOpen(false);
       setEnrollStudentIds('');
       fetchSubjects();
@@ -133,7 +139,8 @@ export default function ManageSubjects() {
         <Button
           variant="outline"
           size="sm"
-          icon={<Users size={14} />}
+          icon={<Users size={14} aria-hidden="true" />}
+          aria-label={`Enrol students in ${s.name}`}
           onClick={() => {
             setSelectedSubject(s);
             setIsEnrollModalOpen(true);
@@ -147,21 +154,16 @@ export default function ManageSubjects() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
-            <BookMarked size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Manage Subjects</h1>
-            <p className="text-[var(--text-muted)] text-sm mt-1">Create subjects and enroll students.</p>
-          </div>
-        </div>
-
-        <Button icon={<Plus size={18} />} onClick={() => setIsAddModalOpen(true)}>
-          Add Subject
-        </Button>
-      </div>
+      <PageHeader
+        icon={<BookMarked size={24} />}
+        title="Manage Subjects"
+        description="Create subjects and enrol students in them."
+        actions={
+          <Button icon={<Plus size={18} aria-hidden="true" />} onClick={() => setIsAddModalOpen(true)}>
+            Add subject
+          </Button>
+        }
+      />
 
       <Card padding="none">
         <Table
@@ -169,7 +171,9 @@ export default function ManageSubjects() {
           data={subjects}
           keyExtractor={(s) => s.id}
           isLoading={isLoading}
-          emptyMessage="No subjects found. Create one to get started."
+          caption="Your subjects"
+          emptyMessage="No subjects yet"
+          emptyDescription="Create a subject, then enrol students to start taking attendance."
         />
       </Card>
 
@@ -177,10 +181,14 @@ export default function ManageSubjects() {
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Create New Subject">
         <form onSubmit={handleAddSubject} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            <label
+              htmlFor="manage-subjects-subject-name"
+              className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+            >
               Subject Name
             </label>
             <input
+              id="manage-subjects-subject-name"
               type="text"
               required
               className="input"
@@ -191,10 +199,14 @@ export default function ManageSubjects() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            <label
+              htmlFor="manage-subjects-subject-code"
+              className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+            >
               Subject Code
             </label>
             <input
+              id="manage-subjects-subject-code"
               type="text"
               required
               className="input"
@@ -206,10 +218,14 @@ export default function ManageSubjects() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              <label
+                htmlFor="manage-subjects-department"
+                className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+              >
                 Department
               </label>
               <select
+                id="manage-subjects-department"
                 className="input"
                 value={newSubject.department}
                 onChange={(e) => setNewSubject({ ...newSubject, department: e.target.value })}
@@ -221,10 +237,14 @@ export default function ManageSubjects() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              <label
+                htmlFor="manage-subjects-semester"
+                className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+              >
                 Semester
               </label>
               <input
+                id="manage-subjects-semester"
                 type="number"
                 min="1"
                 max="8"
@@ -251,22 +271,27 @@ export default function ManageSubjects() {
       <Modal
         isOpen={isEnrollModalOpen}
         onClose={() => setIsEnrollModalOpen(false)}
-        title={`Enroll in ${selectedSubject?.name}`}
+        title={`Enrol students in ${selectedSubject?.name ?? 'subject'}`}
       >
         <form onSubmit={handleEnrollStudents} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Enter Student USNs or Emails (comma separated)
+            <label
+              htmlFor="enrol-identifiers"
+              className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5"
+            >
+              Student USNs or emails
             </label>
             <textarea
-              className="input min-h-[100px] resize-none font-mono text-sm"
-              placeholder="1BM25CS001, 1BM25CS002, student3@bmsce.ac.in..."
+              id="enrol-identifiers"
+              className="input min-h-[100px] resize-y font-mono text-sm"
+              placeholder="1BM25CS001, 1BM25CS002, student3@bmsce.ac.in"
+              aria-describedby="enrol-identifiers-hint"
               value={enrollStudentIds}
               onChange={(e) => setEnrollStudentIds(e.target.value)}
               required
             />
-            <p className="text-xs text-[var(--text-muted)] mt-2">
-              For demo purposes, you can enroll the demo student by typing:{' '}
+            <p id="enrol-identifiers-hint" className="field-hint">
+              Separate entries with commas or new lines. Example:{' '}
               <code className="bg-[var(--bg-elevated)] px-1 py-0.5 rounded text-[var(--text-primary)]">
                 student1@bmsce.ac.in
               </code>
@@ -278,7 +303,7 @@ export default function ManageSubjects() {
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              Enroll Students
+              Enrol students
             </Button>
           </div>
         </form>

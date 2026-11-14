@@ -6,7 +6,8 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import { Shield, ScanFace, Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import ThemeToggle from '../../components/common/ThemeToggle';
+import { Shield, ScanFace, Lock, Mail, Eye, EyeOff, MapPin, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '../../api/client';
 
@@ -22,23 +23,26 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<'student' | 'teacher' | 'admin'>('student');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const { login, isLoading } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     try {
       await login(email, password);
-      toast.success('Logged in successfully!');
+      toast.success('Signed in');
       // Redirection handled by main.tsx ProtectedRoute
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to login. Please check credentials.'));
+      setFormError(getErrorMessage(error, 'Sign-in failed. Check your email and password.'));
     }
   };
 
   // Seeded demo accounts (see `npm run db:seed`). Only pre-filled when explicitly enabled.
   const handleRoleSelect = (role: 'student' | 'teacher' | 'admin') => {
     setActiveTab(role);
+    setFormError(null);
     if (!SHOW_DEMO_LOGINS) return;
     const demo = DEMO_ACCOUNTS[role];
     setEmail(demo.email);
@@ -46,39 +50,56 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-primary)]">
+    <div className="min-h-screen flex bg-[var(--bg-primary)] relative">
+      <ThemeToggle className="absolute top-4 right-4 z-20" />
+
       {/* Left side — Animated Illustration (Hidden on mobile) */}
-      <div className="hidden lg:flex flex-1 flex-col justify-center items-center relative overflow-hidden bg-gradient-to-br from-[#0A0F1E] to-[#111827] border-r border-[var(--border)]">
+      <div className="hidden lg:flex flex-1 flex-col justify-center items-center relative overflow-hidden bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-surface)] border-r border-[var(--border)]">
         {/* Animated background elements */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--accent-primary)] rounded-full mix-blend-screen filter blur-[128px] opacity-20 animate-pulse-glow" />
         <div
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--accent-info)] rounded-full mix-blend-screen filter blur-[128px] opacity-20 animate-pulse-glow"
-          style={{ animationDelay: '1s' }}
+          className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--accent-primary)] rounded-full filter blur-[128px] opacity-20 pointer-events-none"
+          aria-hidden="true"
+        />
+        <div
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--accent-info)] rounded-full filter blur-[128px] opacity-20 pointer-events-none"
+          aria-hidden="true"
         />
 
         <div className="z-10 text-center max-w-lg px-8 animate-fade-in-up">
           <div className="w-24 h-24 mx-auto mb-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[var(--shadow-glow-primary)]">
-            <ScanFace size={48} className="text-white" />
+            <ScanFace size={48} className="text-white" aria-hidden="true" />
           </div>
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+          <p className="text-4xl font-bold mb-4 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
             AttendAI
-          </h1>
-          <h2 className="text-2xl font-semibold mb-6 text-[var(--text-primary)]">
+          </p>
+          <p className="text-2xl font-semibold mb-6 text-[var(--text-primary)]">
             Anti-Proxy Attendance System
-          </h2>
+          </p>
           <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
-            Secure, fast, and frictionless classroom attendance powered by face recognition technology and
-            geospatial validation.
+            Students check in with a face scan from their own phone. The server verifies the face and the
+            campus location, so attendance cannot be marked by a friend.
           </p>
 
-          <div className="mt-12 flex justify-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-light)] text-sm font-medium text-[var(--text-secondary)]">
-              <Shield size={16} className="text-emerald-400" /> Secure
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-light)] text-sm font-medium text-[var(--text-secondary)]">
-              <ScanFace size={16} className="text-indigo-400" /> AI-Powered
-            </div>
-          </div>
+          <ul className="mt-12 flex flex-wrap justify-center gap-3">
+            {[
+              {
+                icon: <ScanFace size={16} className="text-indigo-400" aria-hidden="true" />,
+                label: 'Face match',
+              },
+              { icon: <MapPin size={16} className="text-sky-400" aria-hidden="true" />, label: 'Geofenced' },
+              {
+                icon: <Shield size={16} className="text-emerald-400" aria-hidden="true" />,
+                label: 'Verified server-side',
+              },
+            ].map((item) => (
+              <li
+                key={item.label}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-light)] text-sm font-medium text-[var(--text-secondary)]"
+              >
+                {item.icon} {item.label}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -88,34 +109,41 @@ export default function Login() {
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <ScanFace size={24} className="text-white" />
+              <ScanFace size={24} className="text-white" aria-hidden="true" />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <p className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               AttendAI
-            </h1>
+            </p>
           </div>
 
           <Card glass padding="lg" className="w-full relative overflow-hidden">
             {/* Top decorative gradient line */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
+            <div
+              className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500"
+              aria-hidden="true"
+            />
 
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h2>
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h1>
               <p className="text-[var(--text-muted)]">Sign in to your BMSCE account</p>
             </div>
 
             {/* Role Tabs */}
-            <div className="flex p-1 mb-8 bg-[var(--bg-primary)] rounded-[var(--radius-lg)] border border-[var(--border)]">
+            <div
+              className="flex p-1 mb-8 bg-[var(--bg-primary)] rounded-[var(--radius-lg)] border border-[var(--border)]"
+              role="group"
+              aria-label="I am a"
+            >
               {(['student', 'teacher', 'admin'] as const).map((role) => (
                 <button
                   key={role}
                   type="button"
                   onClick={() => handleRoleSelect(role)}
                   aria-pressed={activeTab === role}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 capitalize ${
+                  className={`flex-1 min-h-10 text-sm font-medium rounded-md transition-all duration-200 capitalize ${
                     activeTab === role
                       ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm border border-[var(--border-light)]'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {role}
@@ -124,6 +152,15 @@ export default function Login() {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 p-3 rounded-[var(--radius-md)] border border-rose-500/30 bg-rose-500/10 text-sm text-[var(--text-primary)]"
+                >
+                  <AlertCircle size={18} className="text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <div>
                 <label
                   htmlFor="login-email"
@@ -133,7 +170,7 @@ export default function Login() {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail size={18} className="text-[var(--text-muted)]" />
+                    <Mail size={18} className="text-[var(--text-muted)]" aria-hidden="true" />
                   </div>
                   <input
                     id="login-email"
@@ -142,6 +179,7 @@ export default function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    aria-invalid={formError ? true : undefined}
                     className="input pl-10"
                     placeholder={`${activeTab}@bmsce.ac.in`}
                   />
@@ -160,7 +198,7 @@ export default function Login() {
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock size={18} className="text-[var(--text-muted)]" />
+                    <Lock size={18} className="text-[var(--text-muted)]" aria-hidden="true" />
                   </div>
                   <input
                     id="login-password"
@@ -169,39 +207,39 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    aria-invalid={formError ? true : undefined}
                     className="input pl-10 pr-10"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                    className="absolute inset-y-0 right-0 w-11 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors rounded-r-[var(--radius-md)]"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPassword}
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? (
+                      <EyeOff size={18} aria-hidden="true" />
+                    ) : (
+                      <Eye size={18} aria-hidden="true" />
+                    )}
                   </button>
                 </div>
               </div>
 
               <Button type="submit" variant="primary" className="w-full mt-2" size="lg" isLoading={isLoading}>
-                Sign In
+                Sign in
               </Button>
             </form>
 
             <div className="mt-8 pt-6 border-t border-[var(--border)] text-center">
               <p className="text-sm text-[var(--text-muted)]">
-                Don't have an account?{' '}
-                <a
-                  href="#"
-                  className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors"
-                >
-                  Contact your department admin
-                </a>
+                No account yet? Accounts are created by your department administrator.
               </p>
             </div>
 
             {SHOW_DEMO_LOGINS && (
-              <div className="mt-6 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 text-center">
+              <div className="mt-6 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-400 text-center">
                 <strong>Demo mode:</strong> click a role tab above to fill in the seeded demo account.
               </div>
             )}

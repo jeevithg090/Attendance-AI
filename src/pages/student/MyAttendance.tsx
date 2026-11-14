@@ -12,10 +12,13 @@ import type { AttendanceRecord } from '../../types';
 import { format, parseISO } from 'date-fns';
 import { CalendarDays, Filter } from 'lucide-react';
 import type { BadgeVariant } from '../../components/ui/Badge';
+import ErrorState from '../../components/ui/ErrorState';
+import PageHeader from '../../components/ui/PageHeader';
 
 export default function MyAttendance() {
   const { user } = useAuthStore();
-  const { getStudentRecords, getStudentStats, isLoading } = useAttendance();
+  const { getStudentRecords, getStudentStats, isLoading, error } = useAttendance();
+  const [reloadKey, setReloadKey] = useState(0);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [filterSubject, setFilterSubject] = useState<string>('');
@@ -46,7 +49,7 @@ export default function MyAttendance() {
       setRecords(data);
     };
     fetchRecords();
-  }, [user, filterSubject, getStudentRecords]);
+  }, [user, filterSubject, getStudentRecords, reloadKey]);
 
   const columns = [
     {
@@ -91,7 +94,7 @@ export default function MyAttendance() {
       header: 'Verification',
       render: (record: AttendanceRecord) => (
         <span className="text-xs text-[var(--text-muted)] capitalize">
-          {record.verificationMethod.replace('_', ' ')}
+          {record.verificationMethod.replace(/_/g, ' ')}
         </span>
       ),
     },
@@ -113,32 +116,29 @@ export default function MyAttendance() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
-            <CalendarDays size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Attendance History</h1>
-            <p className="text-[var(--text-muted)] text-sm mt-1">View your complete attendance records.</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={<CalendarDays size={24} />}
+        title="Attendance History"
+        description="Every class you were marked in, newest first."
+      />
 
       <Card padding="none">
         {/* Filters */}
-        <div className="p-4 border-b border-[var(--border)] flex flex-wrap gap-4 items-center bg-[var(--bg-elevated)] rounded-t-[var(--radius-xl)]">
-          <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-            <Filter size={16} />
-            <span className="text-sm font-medium">Filter by Subject:</span>
-          </div>
-
+        <div className="toolbar">
+          <label
+            htmlFor="history-subject"
+            className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]"
+          >
+            <Filter size={16} aria-hidden="true" />
+            Subject
+          </label>
           <select
-            className="input w-auto min-w-[200px]"
+            id="history-subject"
+            className="input sm:w-auto sm:min-w-[220px]"
             value={filterSubject}
             onChange={(e) => setFilterSubject(e.target.value)}
           >
-            <option value="">All Subjects</option>
+            <option value="">All subjects</option>
             {subjects.map((sub) => (
               <option key={sub.id} value={sub.id}>
                 {sub.name}
@@ -148,14 +148,24 @@ export default function MyAttendance() {
         </div>
 
         {/* Table */}
-        <Table
-          columns={columns}
-          data={records}
-          keyExtractor={(r) => r.id}
-          isLoading={isLoading}
-          emptyMessage="No attendance records found."
-          rowClassName={(r) => (r.status === 'absent' ? 'row-absent' : '')}
-        />
+        {error && records.length === 0 && !isLoading ? (
+          <ErrorState
+            message={error}
+            onRetry={() => setReloadKey((k) => k + 1)}
+            className="border-0 rounded-none"
+          />
+        ) : (
+          <Table
+            caption="Attendance history"
+            columns={columns}
+            data={records}
+            keyExtractor={(r) => r.id}
+            isLoading={isLoading}
+            emptyMessage={filterSubject ? 'No records for this subject yet' : 'No attendance records yet'}
+            emptyDescription="Records appear here after you mark attendance or a session closes."
+            rowClassName={(r) => (r.status === 'absent' ? 'row-absent' : '')}
+          />
+        )}
       </Card>
     </div>
   );

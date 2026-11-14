@@ -3,20 +3,28 @@
 // ═══════════════════════════════════════════════════════════
 
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useFaceRecognition } from '../../hooks/useFaceRecognition';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import { ScanFace, MapPin, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import EmptyState from '../../components/ui/EmptyState';
+import PageHeader from '../../components/ui/PageHeader';
+import { ScanFace, MapPin, CheckCircle, AlertTriangle, Loader2, Clock, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '../../api/client';
 
 export default function MarkAttendance() {
   const { user } = useAuthStore();
-  const { activeSessions, fetchActiveSessions, markAttendance } = useAttendanceStore();
+  const {
+    activeSessions,
+    fetchActiveSessions,
+    markAttendance,
+    isLoading: sessionsLoading,
+  } = useAttendanceStore();
+  const [lastResult, setLastResult] = useState<{ subject: string; status: string } | null>(null);
   const navigate = useNavigate();
   const faceRec = useFaceRecognition();
 
@@ -39,9 +47,8 @@ export default function MarkAttendance() {
           setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
           setLocationError(null);
         },
-        (err) => {
-          console.error('Geolocation error:', err);
-          setLocationError('Location access denied. This may flag your attendance.');
+        () => {
+          setLocationError('Location access was denied or timed out.');
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
@@ -114,7 +121,11 @@ export default function MarkAttendance() {
       if (result.flagged) {
         toast.error(`Attendance flagged: ${result.flagReason}`, { duration: 6000 });
       } else {
-        toast.success(`Attendance marked successfully as ${result.status}`);
+        toast.success(`Attendance marked as ${result.status}`);
+      }
+      if (verified) {
+        const subject = activeSessions.find((s) => s.id === selectedSessionId)?.subjectName ?? 'your class';
+        setLastResult({ subject, status: result.status });
       }
 
       // Stop webcam after short delay to show result
@@ -124,7 +135,6 @@ export default function MarkAttendance() {
         setSubmitting(false);
       }, 2000);
     } catch (error) {
-      console.error('Scan error:', error);
       toast.error(getErrorMessage(error, 'Failed to process scan'));
       setScanResult('failed');
       setTimeout(() => {
@@ -149,44 +159,88 @@ export default function MarkAttendance() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-[var(--radius-md)] bg-indigo-500/15 text-indigo-400">
-          <ScanFace size={24} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">Mark Attendance</h1>
-          <p className="text-[var(--text-muted)] text-sm mt-1">
-            Verify your identity using face recognition.
+      <PageHeader
+        icon={<ScanFace size={24} />}
+        title="Mark Attendance"
+        description="Pick your class, allow location access, then verify your face."
+      />
+
+      {!user?.faceEnrolled && (
+        <div
+          role="alert"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10"
+        >
+          <AlertTriangle className="text-amber-400 shrink-0" size={20} aria-hidden="true" />
+          <p className="text-sm text-[var(--text-primary)] flex-1">
+            Your face is not enrolled yet. Enrol it once from your profile before marking attendance.
           </p>
+          <Link
+            to="/profile"
+            className="inline-flex items-center justify-center gap-2 min-h-9 px-3 rounded-[var(--radius-md)] text-sm font-medium bg-[var(--accent-primary-solid)] hover:bg-[var(--accent-primary-solid-hover)] text-white"
+          >
+            <Camera size={16} aria-hidden="true" /> Enrol face
+          </Link>
         </div>
-      </div>
+      )}
+
+      {lastResult && !isScanning && (
+        <div
+          role="status"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10"
+        >
+          <CheckCircle className="text-emerald-400 shrink-0" size={20} aria-hidden="true" />
+          <p className="text-sm text-[var(--text-primary)] flex-1">
+            You were marked <strong>{lastResult.status}</strong> for {lastResult.subject}.
+          </p>
+          <Link
+            to="/student/my-attendance"
+            className="text-sm font-medium text-[var(--accent-primary)] hover:underline underline-offset-2"
+          >
+            View history
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Column - Setup */}
         <div className="space-y-6">
           <Card>
-            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">
-              1. Select Class
+            <h2 id="step-class" className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-3">
+              1. Select class
             </h2>
 
-            {activeSessions.length === 0 ? (
-              <div className="p-4 rounded-lg bg-[var(--bg-elevated)] text-center text-[var(--text-muted)] text-sm">
-                No active sessions found for your enrolled subjects.
+            {sessionsLoading && activeSessions.length === 0 ? (
+              <div className="space-y-3" aria-busy="true" aria-label="Loading sessions">
+                <div className="skeleton h-16" />
               </div>
+            ) : activeSessions.length === 0 ? (
+              <EmptyState
+                icon={<Clock size={22} />}
+                title="No open sessions"
+                description="When your teacher starts a session for one of your subjects it shows up here."
+                action={
+                  <Button variant="secondary" size="sm" onClick={() => fetchActiveSessions()}>
+                    Check again
+                  </Button>
+                }
+                className="py-4 px-0"
+              />
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3" role="group" aria-labelledby="step-class">
                 {activeSessions.map((session) => (
                   <button
+                    type="button"
                     key={session.id}
+                    aria-pressed={selectedSessionId === session.id}
                     onClick={() => setSelectedSessionId(session.id)}
                     className={`w-full text-left p-3 rounded-lg border transition-all ${
                       selectedSessionId === session.id
-                        ? 'bg-indigo-500/10 border-indigo-500 text-[var(--text-primary)]'
+                        ? 'bg-[var(--accent-primary-soft)] border-[var(--accent-primary)] text-[var(--text-primary)]'
                         : 'bg-[var(--bg-elevated)] border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--text-muted)]'
                     }`}
                   >
                     <div className="font-medium">{session.subjectName}</div>
-                    <div className="flex justify-between mt-1 text-xs opacity-80">
+                    <div className="flex flex-wrap justify-between gap-x-3 mt-1 text-xs">
                       <span>{session.subjectCode}</span>
                       <span>By {session.teacherName}</span>
                     </div>
@@ -197,27 +251,35 @@ export default function MarkAttendance() {
           </Card>
 
           <Card>
-            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">
-              2. Geolocation
-            </h2>
+            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-3">2. Location</h2>
 
             <div className="flex items-start gap-3">
               <div
                 className={`mt-0.5 p-1.5 rounded-full ${location ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}
               >
-                {location ? <MapPin size={16} /> : <AlertTriangle size={16} />}
+                {location ? (
+                  <MapPin size={16} aria-hidden="true" />
+                ) : (
+                  <AlertTriangle size={16} aria-hidden="true" />
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium">{location ? 'Location acquired' : 'Location required'}</p>
+              <div aria-live="polite">
+                <p className="text-sm font-medium">
+                  {location
+                    ? 'Location acquired'
+                    : locationError
+                      ? 'Location unavailable'
+                      : 'Getting your location…'}
+                </p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
                   {locationError ||
                     (location
                       ? `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`
-                      : 'Requesting location access...')}
+                      : 'Allow location access when your browser asks.')}
                 </p>
                 {locationError && (
                   <p className="text-xs text-rose-400 mt-2 font-medium">
-                    Note: Marking attendance without location will flag your entry as a potential proxy.
+                    You can still check in, but your entry will be flagged for your teacher to review.
                   </p>
                 )}
               </div>
@@ -228,27 +290,28 @@ export default function MarkAttendance() {
         {/* Right Column - Scanner */}
         <div>
           <Card className="h-full flex flex-col">
-            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-2">
-              3. Face Scan
+            <h2 className="text-base font-semibold mb-4 border-b border-[var(--border)] pb-3">
+              3. Face scan
             </h2>
 
             <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
               {!isScanning ? (
                 <div className="text-center">
                   <div className="w-20 h-20 mx-auto rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mb-4">
-                    <ScanFace size={32} className="text-[var(--text-muted)]" />
+                    <ScanFace size={32} className="text-[var(--text-muted)]" aria-hidden="true" />
                   </div>
                   <p className="text-sm text-[var(--text-muted)] mb-6 max-w-xs mx-auto">
-                    Position your face clearly in the camera frame in a well-lit area.
+                    Face the camera in good light. The scan starts automatically and takes a few seconds.
                   </p>
 
                   <Button
                     size="lg"
                     onClick={handleStartScan}
-                    disabled={!selectedSessionId || activeSessions.length === 0}
+                    disabled={!selectedSessionId || activeSessions.length === 0 || !user?.faceEnrolled}
                     className="w-full"
+                    icon={<Camera size={18} aria-hidden="true" />}
                   >
-                    Start Face Scan
+                    Start face scan
                   </Button>
                 </div>
               ) : (
@@ -263,6 +326,7 @@ export default function MarkAttendance() {
                     }`}
                   >
                     <video
+                      aria-label="Camera preview"
                       ref={faceRec.videoRef}
                       onPlay={handleVideoPlay}
                       autoPlay
@@ -273,6 +337,7 @@ export default function MarkAttendance() {
                     <canvas
                       ref={faceRec.canvasRef}
                       className="absolute inset-0 w-full h-full transform scale-x-[-1]"
+                      aria-hidden="true"
                     />
 
                     {/* Scanning Animation Overlay */}
@@ -286,7 +351,7 @@ export default function MarkAttendance() {
                     {scanResult === 'success' && (
                       <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center backdrop-blur-sm animate-fade-in">
                         <div className="bg-[var(--bg-surface)] rounded-full p-3 shadow-lg">
-                          <CheckCircle className="text-emerald-500" size={48} />
+                          <CheckCircle className="text-emerald-400" size={48} aria-hidden="true" />
                         </div>
                       </div>
                     )}
@@ -294,17 +359,25 @@ export default function MarkAttendance() {
                     {scanResult === 'failed' && (
                       <div className="absolute inset-0 bg-rose-500/20 flex items-center justify-center backdrop-blur-sm animate-fade-in">
                         <div className="bg-[var(--bg-surface)] rounded-full p-3 shadow-lg">
-                          <AlertTriangle className="text-rose-500" size={48} />
+                          <AlertTriangle className="text-rose-400" size={48} aria-hidden="true" />
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 flex items-center justify-center gap-2">
+                  <div
+                    className="mt-4 flex items-center justify-center gap-2"
+                    role="status"
+                    aria-live="polite"
+                  >
                     {submitting && scanResult === 'pending' ? (
                       <>
-                        <Loader2 className="animate-spin text-[var(--accent-primary)]" size={16} />
-                        <span className="text-sm font-medium animate-pulse">Verifying identity...</span>
+                        <Loader2
+                          className="animate-spin text-[var(--accent-primary)]"
+                          size={16}
+                          aria-hidden="true"
+                        />
+                        <span className="text-sm font-medium">Verifying identity…</span>
                       </>
                     ) : scanResult === 'success' ? (
                       <span className="text-sm font-medium text-emerald-400">
